@@ -3,6 +3,7 @@
   "outputDirectory": "apps/frontend/dist",
   "installCommand": "pnpm install",
   "framework": null,
+  "ignoreCommand": "git diff HEAD^ HEAD --quiet -- apps/frontend vercel.json",
   "rewrites": [
     {
       "source": "/api/:path*",
