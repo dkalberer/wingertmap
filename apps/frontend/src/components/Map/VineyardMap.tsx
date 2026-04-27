@@ -155,7 +155,7 @@ function VineyardActionPanel({ vineyard, onEdit, onClose }: {
   useEffect(() => { if (ref.current) L.DomEvent.disableClickPropagation(ref.current) }, [])
   return (
     <div ref={ref} style={{
-      position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+      position: 'absolute', bottom: 'var(--map-panel-bottom, 20px)', left: '50%', transform: 'translateX(-50%)',
       zIndex: 1000, background: '#fff', borderRadius: 8, padding: '10px 14px',
       boxShadow: '0 2px 12px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', gap: 10,
       fontSize: 13, whiteSpace: 'nowrap',

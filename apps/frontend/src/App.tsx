@@ -301,6 +301,9 @@ function MainLayout() {
           display: 'flex',
           flexDirection: 'column',
           minHeight: 0,
+          '--map-panel-bottom': isMobile
+            ? 'calc(56px + env(safe-area-inset-bottom) + 20px)'
+            : '20px',
         }}
       >
         <VineyardMap
