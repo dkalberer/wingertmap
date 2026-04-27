@@ -2,5 +2,11 @@
   "buildCommand": "pnpm --filter frontend build",
   "outputDirectory": "apps/frontend/dist",
   "installCommand": "pnpm install",
-  "framework": null
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/api/:path*",
+      "destination": "https://wingertmap.onrender.com/api/:path*"
+    }
+  ]
 }
