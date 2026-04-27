@@ -90,12 +90,29 @@ type TimeEntryCreateParams struct {
 	CreatedBy   uuid.UUID
 }
 
+// TimeEntryImportRow represents a single row from a CSV import.
+type TimeEntryImportRow struct {
+	Date         string  // YYYY-MM-DD
+	EmployeeName string
+	WorkTypeName string  // optional
+	Hours        float64
+	Description  string  // optional
+}
+
+// TimeEntryImportResult summarises the outcome of a CSV import.
+type TimeEntryImportResult struct {
+	Imported int      `json:"imported"`
+	Skipped  int      `json:"skipped"`
+	Errors   []string `json:"errors,omitempty"`
+}
+
 // TimeEntryRepository defines all persistence operations for time entries.
 type TimeEntryRepository interface {
 	Create(p TimeEntryCreateParams) (*TimeEntry, error)
 	ListByUser(userID uuid.UUID, year int) ([]TimeEntry, error)
 	Delete(id, userID uuid.UUID) error
 	StatsByYear(userID uuid.UUID, year int) ([]EmployeeMonthStats, error)
+	Import(rows []TimeEntryImportRow, createdBy uuid.UUID) (*TimeEntryImportResult, error)
 }
 
 // VintageJournalRepository defines all persistence operations for vintage journals.

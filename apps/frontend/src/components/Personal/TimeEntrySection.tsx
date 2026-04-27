@@ -1,12 +1,15 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   Box, Button, Divider, IconButton, List, ListItem, ListItemText,
-  MenuItem, Select, TextField, Typography,
+  MenuItem, Select, TextField, Typography, Alert,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
+import DownloadIcon from '@mui/icons-material/Download'
+import UploadIcon from '@mui/icons-material/Upload'
 import type { Vineyard } from '../../types'
 import { usePersonalStore } from '../../store/personalStore'
+import { exportTimeEntries, importTimeEntries, type ImportResult } from '../../api/timeEntries'
 
 const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
@@ -23,6 +26,29 @@ export default function TimeEntrySection({ vineyard }: Props) {
   const [hours, setHours] = useState('')
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
+  const [importResult, setImportResult] = useState<ImportResult | null>(null)
+  const [importError, setImportError] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  async function handleExport() {
+    await exportTimeEntries(year)
+  }
+
+  async function handleImportFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setImportResult(null)
+    setImportError('')
+    try {
+      const result = await importTimeEntries(file)
+      setImportResult(result)
+      await usePersonalStore.getState().loadAll()
+    } catch {
+      setImportError('Import fehlgeschlagen.')
+    } finally {
+      e.target.value = ''
+    }
+  }
 
   async function handleSubmit() {
     if (!employeeId || !entryDate || !hours) return
@@ -55,12 +81,37 @@ export default function TimeEntrySection({ vineyard }: Props) {
             <MenuItem key={y} value={y}>{y}</MenuItem>
           ))}
         </Select>
-        {vineyard && (
-          <Typography variant="caption" color="text.secondary" sx={{ ml: 'auto' }}>
-            {vineyard.name}
-          </Typography>
-        )}
+        <Box sx={{ ml: 'auto', display: 'flex', gap: 0.5 }}>
+          <IconButton size="small" title="Exportieren" onClick={handleExport}>
+            <DownloadIcon fontSize="small" />
+          </IconButton>
+          <IconButton size="small" title="Importieren" onClick={() => fileInputRef.current?.click()}>
+            <UploadIcon fontSize="small" />
+          </IconButton>
+          <input ref={fileInputRef} type="file" accept=".csv" hidden onChange={handleImportFile} />
+        </Box>
       </Box>
+
+      {importResult && (
+        <Alert
+          severity={importResult.skipped > 0 ? 'warning' : 'success'}
+          onClose={() => setImportResult(null)}
+          sx={{ mx: 2, mt: 1 }}
+        >
+          {importResult.imported} Zeilen importiert
+          {importResult.skipped > 0 && `, ${importResult.skipped} übersprungen`}
+          {importResult.errors && importResult.errors.length > 0 && (
+            <Box component="ul" sx={{ m: 0, pl: 2, mt: 0.5 }}>
+              {importResult.errors.map((e, i) => <li key={i}>{e}</li>)}
+            </Box>
+          )}
+        </Alert>
+      )}
+      {importError && (
+        <Alert severity="error" onClose={() => setImportError('')} sx={{ mx: 2, mt: 1 }}>
+          {importError}
+        </Alert>
+      )}
 
       <List dense disablePadding sx={{ maxHeight: 280, overflow: 'auto' }}>
         {entries.map((entry) => (

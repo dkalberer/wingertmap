@@ -28,3 +28,33 @@ export async function getTimeEntryStats(year: number): Promise<EmployeeMonthStat
   const res = await apiClient.get<EmployeeMonthStats[]>(`/time-entries/stats?year=${year}`)
   return res.data
 }
+
+export async function exportTimeEntries(year: number): Promise<void> {
+  const token = localStorage.getItem('token')
+  const res = await fetch(`/api/time-entries/export?year=${year}`, {
+    headers: { Authorization: `Bearer ${token ?? ''}` },
+  })
+  if (!res.ok) throw new Error('Export fehlgeschlagen')
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `stunden_${year}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export interface ImportResult {
+  imported: number
+  skipped: number
+  errors?: string[]
+}
+
+export async function importTimeEntries(file: File): Promise<ImportResult> {
+  const form = new FormData()
+  form.append('file', file)
+  const res = await apiClient.post<ImportResult>('/time-entries/import', form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+  return res.data
+}

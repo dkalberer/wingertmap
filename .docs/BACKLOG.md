@@ -86,7 +86,6 @@ DELETE /api/pruning/{id}
 ---
 TODO:
 - Lidar höhenmap einbaeun?
-- Export & Import Mitarbeiterstunden
 
 ---
 

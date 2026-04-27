@@ -143,6 +143,8 @@ func main() {
 		r.Post("/api/time-entries", timeEntryH.Create)
 		r.Delete("/api/time-entries/{id}", timeEntryH.Delete)
 		r.Get("/api/time-entries/stats", timeEntryH.Stats)
+		r.Get("/api/time-entries/export", timeEntryH.Export)
+		r.Post("/api/time-entries/import", timeEntryH.Import)
 
 		r.Get("/api/tasks/{taskID}/photos", photoH.List)
 		r.Post("/api/tasks/{taskID}/photos", photoH.Upload)

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -141,6 +142,64 @@ func (s *TimeEntryStore) loadOne(id uuid.UUID) (*domain.TimeEntry, error) {
 	}
 	entry := toTimeEntry(rows[0])
 	return &entry, nil
+}
+
+func (s *TimeEntryStore) Import(rows []domain.TimeEntryImportRow, createdBy uuid.UUID) (*domain.TimeEntryImportResult, error) {
+	// Build name→ID maps for employees and work types owned by this user.
+	var empRows []employeeScanRow
+	if err := s.db.Raw(`SELECT id, name, created_by, created_at FROM employees WHERE created_by = ?`, createdBy).Scan(&empRows).Error; err != nil {
+		return nil, err
+	}
+	empMap := make(map[string]uuid.UUID, len(empRows))
+	for _, e := range empRows {
+		empMap[e.Name] = e.ID
+	}
+
+	var wtRows []workTypeScanRow
+	if err := s.db.Raw(`SELECT id, name, created_by, created_at FROM work_types WHERE created_by = ?`, createdBy).Scan(&wtRows).Error; err != nil {
+		return nil, err
+	}
+	wtMap := make(map[string]uuid.UUID, len(wtRows))
+	for _, wt := range wtRows {
+		wtMap[wt.Name] = wt.ID
+	}
+
+	result := &domain.TimeEntryImportResult{}
+	for i, row := range rows {
+		lineNum := i + 2 // header is line 1
+		empID, ok := empMap[row.EmployeeName]
+		if !ok {
+			result.Errors = append(result.Errors, fmt.Sprintf("Zeile %d: Mitarbeiter %q nicht gefunden", lineNum, row.EmployeeName))
+			result.Skipped++
+			continue
+		}
+		if row.Hours <= 0 {
+			result.Errors = append(result.Errors, fmt.Sprintf("Zeile %d: ungültige Stunden", lineNum))
+			result.Skipped++
+			continue
+		}
+
+		params := domain.TimeEntryCreateParams{
+			EmployeeID:  empID,
+			EntryDate:   row.Date,
+			Hours:       row.Hours,
+			Description: row.Description,
+			CreatedBy:   createdBy,
+		}
+		if row.WorkTypeName != "" {
+			if id, ok := wtMap[row.WorkTypeName]; ok {
+				params.WorkTypeID = &id
+			}
+		}
+
+		if _, err := s.Create(params); err != nil {
+			result.Errors = append(result.Errors, fmt.Sprintf("Zeile %d: %v", lineNum, err))
+			result.Skipped++
+			continue
+		}
+		result.Imported++
+	}
+	return result, nil
 }
 
 func toTimeEntry(r timeEntryScanRow) domain.TimeEntry {
