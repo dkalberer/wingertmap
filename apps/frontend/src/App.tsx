@@ -296,10 +296,11 @@ function MainLayout() {
         component="main"
         sx={{
           flexGrow: 1,
-          mt: `${APPBAR_HEIGHT}px`,
+          pt: `${APPBAR_HEIGHT}px`,
           pb: isMobile ? 'calc(56px + env(safe-area-inset-bottom))' : 0,
           display: 'flex',
           flexDirection: 'column',
+          minHeight: 0,
         }}
       >
         <VineyardMap

@@ -316,7 +316,7 @@ export default function VineyardMap({
     <Box
       data-testid="vineyard-map"
       sx={{
-        width: '100%', height: '100%', position: 'relative',
+        width: '100%', flex: 1, minHeight: 0, position: 'relative',
         cursor: pickingLocation ? 'crosshair' : undefined,
       }}
     >

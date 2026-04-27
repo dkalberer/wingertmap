@@ -19,6 +19,6 @@ describe('TaskList', () => {
 
   it('shows empty state when no tasks', () => {
     render(<TaskList tasks={[]} onStatusChange={vi.fn()} onSelect={vi.fn()} />)
-    expect(screen.getByText(/keine aufgaben/i)).toBeInTheDocument()
+    expect(screen.getByText(/keine offenen aufgaben/i)).toBeInTheDocument()
   })
 })
