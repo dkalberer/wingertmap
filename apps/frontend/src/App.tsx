@@ -6,6 +6,7 @@ import {
   Drawer, SwipeableDrawer, useMediaQuery, useTheme,
   Badge, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader,
   BottomNavigation, BottomNavigationAction, Button,
+  Snackbar, Alert,
 } from '@mui/material'
 import LogoutIcon from '@mui/icons-material/Logout'
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts'
@@ -44,10 +45,10 @@ function MainLayout() {
   const token = useAuthStore((s) => s.token)
   const hydrate = useAuthStore((s) => s.hydrate)
 
-  useEffect(() => { hydrate() }, [hydrate])
+  useEffect(() => { hydrate() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   const { setCenter, setZoom } = useMapStore()
   const { vineyards } = useVineyardStore()
-  const { tasks, loading: tasksLoading, error: tasksError, load: loadTasks, create: createTask, changeStatus, remove: removeTask } = useTaskStore()
+  const { tasks, loading: tasksLoading, error: tasksError, load: loadTasks, create: createTask, changeStatus, remove: removeTask, notification, clearNotification } = useTaskStore()
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
 
@@ -140,7 +141,6 @@ function MainLayout() {
 
   const openTaskCount = tasks.filter((t) => t.status !== 'erledigt').length
 
-  // Nav order: Weinberge(0), Aufgaben(1), Ernte(2) | Sorten(3), Personal(4)
   const nutzungItems = [
     { index: 0, label: 'Weinberge', icon: <ForestIcon fontSize="small" /> },
     { index: 1, label: 'Aufgaben', icon: <Badge badgeContent={openTaskCount} color="error" max={99}><ListAltIcon fontSize="small" /></Badge> },
@@ -152,7 +152,6 @@ function MainLayout() {
   ]
 
   const tabContents: React.ReactNode[] = [
-    // 0: Weinberge
     <Box sx={{ overflow: 'auto', flex: 1 }}>
       <VineyardList onSelect={selectVineyard} />
       {selected && (
@@ -162,7 +161,6 @@ function MainLayout() {
         </>
       )}
     </Box>,
-    // 1: Aufgaben
     <Box sx={{ overflow: 'auto', flex: 1 }}>
       <GlobalTasksPanel
         tasks={tasks}
@@ -180,15 +178,12 @@ function MainLayout() {
         onTaskSelect={handleTaskSelect}
       />
     </Box>,
-    // 2: Ernte
     <Box sx={{ overflow: 'auto', flex: 1 }}>
       <HarvestPage vineyard={selected} />
     </Box>,
-    // 3: Sorten
     <Box sx={{ overflow: 'auto', flex: 1 }}>
       <VarietyManager />
     </Box>,
-    // 4: Personal
     <Box sx={{ overflow: 'auto', flex: 1 }}>
       <PersonalPage vineyard={selected} />
     </Box>,
@@ -343,18 +338,9 @@ function MainLayout() {
             paddingBottom: 'env(safe-area-inset-bottom)',
           }}
         >
-          <BottomNavigationAction label="Weinberge" icon={<ForestIcon />} />
-          <BottomNavigationAction
-            label="Aufgaben"
-            icon={
-              <Badge badgeContent={openTaskCount} color="error" max={99}>
-                <ListAltIcon />
-              </Badge>
-            }
-          />
-          <BottomNavigationAction label="Ernte" icon={<AgricultureIcon />} />
-          <BottomNavigationAction label="Sorten" icon={<GrapeIcon />} />
-          <BottomNavigationAction label="Personal" icon={<PeopleIcon />} />
+          {[...nutzungItems, ...verwaltungItems].map(({ index, label, icon }) => (
+            <BottomNavigationAction key={index} label={label} icon={icon} />
+          ))}
         </BottomNavigation>
       )}
 
@@ -366,6 +352,18 @@ function MainLayout() {
           </Box>
         </DialogContent>
       </Dialog>
+
+      <Snackbar
+        open={!!notification}
+        autoHideDuration={3000}
+        onClose={clearNotification}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        sx={{ bottom: isMobile ? 'calc(64px + env(safe-area-inset-bottom))' : 16 }}
+      >
+        <Alert onClose={clearNotification} severity={notification?.severity} variant="filled" sx={{ width: '100%' }}>
+          {notification?.message}
+        </Alert>
+      </Snackbar>
 
       <Dialog open={addOpen} onClose={() => { setAddOpen(false); setPendingBoundary(null) }} maxWidth="xs" fullWidth>
         <DialogTitle>Neuer Wingert</DialogTitle>

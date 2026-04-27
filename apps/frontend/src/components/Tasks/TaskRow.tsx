@@ -4,22 +4,12 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle'
 import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked'
 import PlaceIcon from '@mui/icons-material/Place'
 import type { Task, TaskStatus } from '../../types'
-import { labelForCategory, iconForCategory } from '../../utils/taskLabels'
+import { labelForCategory, iconForCategory, isOverdue, isDueToday } from '../../utils/taskLabels'
 
 interface Props {
   task: Task
   onStatusChange: (id: string, status: TaskStatus) => void
   onSelect: (task: Task) => void
-}
-
-function isOverdue(t: Task) {
-  if (!t.dueDate || t.status === 'erledigt') return false
-  return new Date(t.dueDate) < new Date(new Date().toDateString())
-}
-
-function isDueToday(t: Task) {
-  if (!t.dueDate || t.status === 'erledigt') return false
-  return new Date(t.dueDate).toDateString() === new Date().toDateString()
 }
 
 export default function TaskRow({ task, onStatusChange, onSelect }: Props) {

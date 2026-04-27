@@ -205,12 +205,18 @@ function VineyardBoundaries({ vineyards, selectedVineyardId, onVineyardClick, on
     const editHandler = new (L.EditToolbar.Edit as any)(map, { featureGroup: L.featureGroup([poly]) })
     editHandler.enable()
 
-    map.once('click', async () => {
-      editHandler.save()
+    function cancel() {
+      map.off('click', onSave)
       editHandler.disable()
-      const rings = poly.getLatLngs() as L.LatLng[][]
-      map.removeLayer(poly)
+      try { map.removeLayer(poly) } catch {}
       setEditingId(null)
+      document.removeEventListener('keydown', onEscape)
+    }
+
+    async function onSave() {
+      editHandler.save()
+      const rings = poly.getLatLngs() as L.LatLng[][]
+      cancel()
       const ring = rings[0] as L.LatLng[]
       if (ring && ring.length >= 3) {
         const closed = [...ring.map((ll): [number, number] => [ll.lng, ll.lat]), [ring[0].lng, ring[0].lat] as [number, number]]
@@ -218,7 +224,14 @@ function VineyardBoundaries({ vineyards, selectedVineyardId, onVineyardClick, on
         await updateVineyard(v.id, { name: v.name, description: v.description, boundary })
         onBoundaryUpdated()
       }
-    })
+    }
+
+    function onEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') cancel()
+    }
+
+    map.once('click', onSave)
+    document.addEventListener('keydown', onEscape)
   }
 
   return (

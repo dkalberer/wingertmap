@@ -80,24 +80,25 @@ function CollapsibleGroup({ group }: { group: Group & { onStatusChange: Props['o
 export default function TaskList({ tasks, onStatusChange, onSelect }: Props) {
   if (tasks.length === 0) {
     return (
-      <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
-        Keine Aufgaben vorhanden.
-      </Typography>
+      <Box sx={{ py: 4, textAlign: 'center', px: 2 }}>
+        <Typography sx={{ fontSize: 36, mb: 1 }}>✓</Typography>
+        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>Keine offenen Aufgaben</Typography>
+        <Typography variant="caption" color="text.secondary">
+          Neue Aufgabe erstellen oder Standort auf der Karte wählen.
+        </Typography>
+      </Box>
     )
   }
 
-  const overdue = tasks.filter((t) => getDateGroup(t) === 'overdue')
-  const today   = tasks.filter((t) => getDateGroup(t) === 'today')
-  const week    = tasks.filter((t) => getDateGroup(t) === 'week')
-  const later   = tasks.filter((t) => getDateGroup(t) === 'later')
-  const done    = tasks.filter((t) => getDateGroup(t) === 'done')
+  const buckets: Record<string, Task[]> = { overdue: [], today: [], week: [], later: [], done: [] }
+  for (const t of tasks) buckets[getDateGroup(t)].push(t)
 
   const groups: Group[] = [
-    { key: 'overdue', label: '⚠ Überfällig', tasks: overdue, defaultOpen: true, urgent: true },
-    { key: 'today',   label: '⏰ Heute',      tasks: today,   defaultOpen: true },
-    { key: 'week',    label: '📅 Diese Woche', tasks: week,    defaultOpen: true },
-    { key: 'later',   label: '📋 Später',      tasks: later,   defaultOpen: true },
-    { key: 'done',    label: '✓ Erledigt',     tasks: done,    defaultOpen: false },
+    { key: 'overdue', label: '⚠ Überfällig',  tasks: buckets.overdue, defaultOpen: true, urgent: true },
+    { key: 'today',   label: '⏰ Heute',        tasks: buckets.today,   defaultOpen: true },
+    { key: 'week',    label: '📅 Diese Woche',  tasks: buckets.week,    defaultOpen: true },
+    { key: 'later',   label: '📋 Später',       tasks: buckets.later,   defaultOpen: true },
+    { key: 'done',    label: '✓ Erledigt',      tasks: buckets.done,    defaultOpen: false },
   ].filter((g) => g.tasks.length > 0)
 
   return (

@@ -1,4 +1,4 @@
-import type { TaskStatus, TaskCategory, Severity } from '../types'
+import type { Task, TaskStatus, TaskCategory, Severity } from '../types'
 
 export const CATEGORY_LABELS: Record<TaskCategory, string> = {
   pflanzenschutz: 'Pflanzenschutz',
@@ -47,6 +47,16 @@ export const TASK_STATUS_NEXT_LABEL: Record<TaskStatus, string> = {
 export const ORDERED_CATEGORIES: TaskCategory[] = [
   'pflanzenschutz', 'rebenpflege', 'infrastruktur', 'boden', 'phaenologie', 'sonstiges',
 ]
+
+export function isOverdue(t: Task): boolean {
+  if (!t.dueDate || t.status === 'erledigt') return false
+  return new Date(t.dueDate) < new Date(new Date().toDateString())
+}
+
+export function isDueToday(t: Task): boolean {
+  if (!t.dueDate || t.status === 'erledigt') return false
+  return new Date(t.dueDate).toDateString() === new Date().toDateString()
+}
 
 export function labelForCategory(category: string): string {
   return CATEGORY_LABELS[category as TaskCategory] ?? category

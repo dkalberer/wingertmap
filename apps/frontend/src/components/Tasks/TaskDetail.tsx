@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import {
   Box, Typography, IconButton, ToggleButton, ToggleButtonGroup,
-  Chip, Divider, Button, ImageList, ImageListItem, CircularProgress,
+  Chip, Divider, Button, ImageList, ImageListItem, CircularProgress, Alert,
 } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import PlaceIcon from '@mui/icons-material/Place'
@@ -11,7 +11,7 @@ import DeleteIcon from '@mui/icons-material/Delete'
 import type { Task, TaskStatus } from '../../types'
 import {
   TASK_STATUS_LABELS, CATEGORY_LABELS, SEVERITY_LABELS,
-  labelForCategory, iconForCategory,
+  labelForCategory, iconForCategory, isOverdue,
 } from '../../utils/taskLabels'
 import { listPhotos, uploadPhoto } from '../../api/photos'
 import type { TaskPhoto } from '../../api/photos'
@@ -27,14 +27,10 @@ interface Props {
 
 const STATUS_ORDER: TaskStatus[] = ['offen', 'in_bearbeitung', 'erledigt']
 
-function isOverdue(t: Task) {
-  if (!t.dueDate || t.status === 'erledigt') return false
-  return new Date(t.dueDate) < new Date(new Date().toDateString())
-}
-
 export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onDelete }: Props) {
   const [photos, setPhotos] = useState<TaskPhoto[]>([])
   const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const overdue = isOverdue(task)
@@ -47,9 +43,12 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
     const file = e.target.files?.[0]
     if (!file) return
     setUploading(true)
+    setUploadError(null)
     try {
       const photo = await uploadPhoto(task.id, file)
       setPhotos((p) => [...p, photo])
+    } catch {
+      setUploadError('Upload fehlgeschlagen. Bitte erneut versuchen.')
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -58,7 +57,6 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', px: 1, pt: 1, pb: 0.5, gap: 0.5 }}>
         <IconButton size="small" onClick={onBack} aria-label="Zurück">
           <ArrowBackIcon fontSize="small" />
@@ -69,12 +67,10 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
       </Box>
 
       <Box sx={{ flex: 1, overflow: 'auto', px: 2, pb: 2 }}>
-        {/* Title */}
         <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3, mt: 0.5, mb: 2 }}>
           {iconForCategory(task.category)} {task.title || labelForCategory(task.category)}
         </Typography>
 
-        {/* Status */}
         <ToggleButtonGroup
           value={task.status}
           exclusive
@@ -106,9 +102,7 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* Metadata */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          {/* Category + Severity */}
           <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
             <Chip
               label={CATEGORY_LABELS[task.category]}
@@ -128,7 +122,6 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
             )}
           </Box>
 
-          {/* Due date */}
           {task.dueDate && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <CalendarTodayIcon sx={{ fontSize: 16, color: overdue ? 'error.main' : 'text.secondary' }} />
@@ -142,7 +135,6 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
             </Box>
           )}
 
-          {/* Notes */}
           {task.notes && (
             <Box>
               <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
@@ -154,7 +146,6 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
             </Box>
           )}
 
-          {/* Location */}
           {task.location && onLocate && (
             <Box>
               <Button
@@ -170,7 +161,6 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
             </Box>
           )}
 
-          {/* Photos */}
           <Box>
             <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', letterSpacing: 0.5, fontWeight: 600 }}>
               Fotos
@@ -183,6 +173,11 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
                   </ImageListItem>
                 ))}
               </ImageList>
+            )}
+            {uploadError && (
+              <Alert severity="error" onClose={() => setUploadError(null)} sx={{ mt: 0.5, py: 0 }}>
+                {uploadError}
+              </Alert>
             )}
             <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={handleUpload} />
             <Button
@@ -199,7 +194,6 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
 
         <Divider sx={{ mt: 2, mb: 1.5 }} />
 
-        {/* Delete */}
         {!confirmDelete ? (
           <Button
             size="small"
