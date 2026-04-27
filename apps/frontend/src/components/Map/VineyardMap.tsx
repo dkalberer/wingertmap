@@ -11,6 +11,9 @@ import GpsOffIcon from '@mui/icons-material/GpsOff'
 import MapIcon from '@mui/icons-material/Map'
 import SatelliteAltIcon from '@mui/icons-material/SatelliteAlt'
 import AddLocationAltIcon from '@mui/icons-material/AddLocationAlt'
+import TerrainIcon from '@mui/icons-material/Terrain'
+import GradientIcon from '@mui/icons-material/Gradient'
+import HeightIcon from '@mui/icons-material/Height'
 import L from 'leaflet'
 import { useMapStore } from '../../store/mapStore'
 import { useGPS } from '../../hooks/useGPS'
@@ -105,6 +108,29 @@ interface Props {
 }
 
 type BaseLayer = 'karte' | 'luftbild'
+type OverlayKey = 'relief' | 'hangneigung' | 'hoehe'
+
+const OVERLAYS: { key: OverlayKey; label: string; icon: React.ReactNode; url?: string; opacity?: number }[] = [
+  {
+    key: 'relief',
+    label: 'LiDAR Reliefschattierung',
+    icon: <TerrainIcon fontSize="small" />,
+    url: 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissalti3d-reliefschattierung/default/current/3857/{z}/{x}/{y}.png',
+    opacity: 0.5,
+  },
+  {
+    key: 'hangneigung',
+    label: 'Steillagen Rebbau',
+    icon: <GradientIcon fontSize="small" />,
+    url: 'https://wmts.geo.admin.ch/1.0.0/ch.blw.steil_terrassenlagen_rebbau/default/current/3857/{z}/{x}/{y}.png',
+    opacity: 0.6,
+  },
+  {
+    key: 'hoehe',
+    label: 'Höhe bei Klick',
+    icon: <HeightIcon fontSize="small" />,
+  },
+]
 
 function FlyToHandler({ onFlyTo }: { onFlyTo?: (handler: (lat: number, lng: number, zoom?: number) => void) => void }) {
   const map = useMap()
@@ -117,6 +143,36 @@ function FlyToHandler({ onFlyTo }: { onFlyTo?: (handler: (lat: number, lng: numb
   return null
 }
 
+/** Approximate WGS84 → LV95 conversion (swisstopo formula, ~1m accuracy) */
+function wgs84ToLV95(lat: number, lng: number): [number, number] {
+  const phi = (lat * 3600 - 169028.66) / 10000
+  const lam = (lng * 3600 - 26782.5) / 10000
+  const e = 2600072.37 + 211455.93 * lam - 10938.51 * lam * phi - 0.36 * lam * phi * phi - 44.54 * lam * lam * lam
+  const n = 1200147.07 + 308807.95 * phi + 3745.25 * lam * lam + 76.63 * phi * phi - 194.56 * lam * lam * phi + 119.79 * phi * phi * phi
+  return [e, n]
+}
+
+function ElevationQuery() {
+  const map = useMap()
+  useMapEvents({
+    click(e) {
+      const [east, north] = wgs84ToLV95(e.latlng.lat, e.latlng.lng)
+      fetch(`https://api3.geo.admin.ch/rest/services/height?easting=${east}&northing=${north}&sr=2056`)
+        .then((r) => r.json())
+        .then((d) => {
+          const h = parseFloat(d.height)
+          if (isNaN(h)) return
+          L.popup({ closeButton: true })
+            .setLatLng(e.latlng)
+            .setContent(`<b>${Math.round(h)} m ü.M.</b>`)
+            .openOn(map)
+        })
+        .catch(() => {})
+    },
+  })
+  return null
+}
+
 export default function VineyardMap({
   onDrawComplete, selectedVineyardId, onVineyardClick,
   tasks = [], pickingLocation = false, onLocationPicked, onFlyTo,
@@ -126,6 +182,13 @@ export default function VineyardMap({
   const { position, error: gpsError, startWatching, stopWatching } = useGPS()
   const [gpsActive, setGpsActive] = useState(false)
   const [baseLayer, setBaseLayer] = useState<BaseLayer>('karte')
+  const [activeOverlays, setActiveOverlays] = useState<OverlayKey[]>([])
+
+  function toggleOverlay(key: OverlayKey) {
+    setActiveOverlays((prev) =>
+      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
+    )
+  }
   const [rows, setRows] = useState<Row[]>([])
   const [selectedVine, setSelectedVine] = useState<Vine | null>(null)
 
@@ -181,6 +244,11 @@ export default function VineyardMap({
         )}
         <FlyToCenter center={center} zoom={zoom} />
         <FlyToHandler onFlyTo={onFlyTo} />
+
+        {OVERLAYS.filter((o) => o.url && activeOverlays.includes(o.key)).map((o) => (
+          <TileLayer key={o.key} url={o.url!} opacity={o.opacity} maxNativeZoom={18} maxZoom={22} />
+        ))}
+        {activeOverlays.includes('hoehe') && !pickingLocation && <ElevationQuery />}
 
         {vineyards.map((v) => {
           if (!v.boundary) return null
@@ -277,6 +345,26 @@ export default function VineyardMap({
             </IconButton>
           </Box>
         </Tooltip>
+
+        <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, boxShadow: 2 }}>
+          <ToggleButtonGroup orientation="vertical" size="small">
+            {OVERLAYS.map((o, i) => (
+              <Tooltip key={o.key} title={o.label} placement="left">
+                <span>
+                  <ToggleButton
+                    value={o.key}
+                    selected={activeOverlays.includes(o.key)}
+                    onChange={() => toggleOverlay(o.key)}
+                    aria-label={o.label}
+                    sx={i < OVERLAYS.length - 1 ? { borderBottom: 1, borderColor: 'divider' } : undefined}
+                  >
+                    {o.icon}
+                  </ToggleButton>
+                </span>
+              </Tooltip>
+            ))}
+          </ToggleButtonGroup>
+        </Box>
 
         {gpsError && <Chip label={gpsError} color="error" size="small" sx={{ maxWidth: 160 }} />}
       </Box>
