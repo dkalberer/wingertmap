@@ -85,13 +85,8 @@ DELETE /api/pruning/{id}
 
 ---
 TODO:
-- Navigation ändern. Sollte auf Handy und Laptop angepasst sein.
-  - Kategorisieren. Admin pages also verwaltung und nutzen
-- Login via Apple ID?
-- Hosting in der Schweiz? self hosting oder cloud? teuer?
 - Lidar höhenmap einbaeun?
 - Export & Import Mitarbeiterstunden
-
 
 ---
 

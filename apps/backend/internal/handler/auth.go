@@ -13,27 +13,6 @@ type AuthHandler struct{ svc domain.AuthService }
 
 func NewAuthHandler(svc domain.AuthService) *AuthHandler { return &AuthHandler{svc: svc} }
 
-func (h *AuthHandler) Register(w http.ResponseWriter, r *http.Request) {
-	var req struct {
-		Email    string `json:"email"`
-		Name     string `json:"name"`
-		Password string `json:"password"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid request")
-		return
-	}
-	user, err := h.svc.Register(req.Email, req.Name, req.Password)
-	if err != nil {
-		if err.Error() == "user already exists" {
-			writeError(w, http.StatusConflict, err.Error())
-			return
-		}
-		writeError(w, http.StatusInternalServerError, err.Error())
-		return
-	}
-	writeJSON(w, http.StatusCreated, user)
-}
 
 func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -50,6 +29,37 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"token": token, "user": user})
+}
+
+
+func (h *AuthHandler) ChangePassword(w http.ResponseWriter, r *http.Request) {
+	claims := middleware.ClaimsFromContext(r.Context())
+	if claims == nil {
+		writeError(w, http.StatusUnauthorized, "unauthorized")
+		return
+	}
+	var req struct {
+		CurrentPassword string `json:"currentPassword"`
+		NewPassword     string `json:"newPassword"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid request")
+		return
+	}
+	if req.CurrentPassword == "" || req.NewPassword == "" {
+		writeError(w, http.StatusBadRequest, "currentPassword and newPassword required")
+		return
+	}
+	id, err := uuid.Parse(claims.UserID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "invalid user id in token")
+		return
+	}
+	if err := h.svc.ChangePassword(id, req.CurrentPassword, req.NewPassword); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"message": "Passwort erfolgreich geändert."})
 }
 
 func (h *AuthHandler) Me(w http.ResponseWriter, r *http.Request) {

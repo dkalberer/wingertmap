@@ -38,27 +38,6 @@ func NewAuthService(db *gorm.DB, jwtSecret string) *AuthService {
 	return &AuthService{db: db, jwtSecret: []byte(jwtSecret)}
 }
 
-func (s *AuthService) Register(email, name, password string) (*domain.User, error) {
-	var existing userRow
-	if err := s.db.Where("email = ?", email).First(&existing).Error; err == nil {
-		return nil, errors.New("user already exists")
-	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return nil, err
-	}
-	row := userRow{
-		ID:           uuid.New(),
-		Email:        email,
-		Name:         name,
-		PasswordHash: string(hash),
-		Role:         "viewer",
-	}
-	if err := s.db.Create(&row).Error; err != nil {
-		return nil, err
-	}
-	return rowToUser(row), nil
-}
 
 func (s *AuthService) Login(email, password string) (string, *domain.User, error) {
 	var row userRow
@@ -111,6 +90,21 @@ func (s *AuthService) generateToken(row userRow) (string, error) {
 		},
 	}
 	return jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString(s.jwtSecret)
+}
+
+func (s *AuthService) ChangePassword(userID uuid.UUID, currentPassword, newPassword string) error {
+	var row userRow
+	if err := s.db.First(&row, "id = ?", userID).Error; err != nil {
+		return errors.New("user not found")
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(row.PasswordHash), []byte(currentPassword)); err != nil {
+		return errors.New("aktuelles Passwort falsch")
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	return s.db.Model(&row).Update("password_hash", string(hash)).Error
 }
 
 func rowToUser(r userRow) *domain.User {

@@ -14,11 +14,13 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
-// On 401, clear token and reload to login page
+// On 401 (outside of auth endpoints), clear token and redirect to login
 apiClient.interceptors.response.use(
   (r) => r,
   (err) => {
-    if (err.response?.status === 401) {
+    const url: string = err.config?.url ?? ''
+    const isAuthEndpoint = url.includes('/auth/login') || url.includes('/auth/change-password')
+    if (err.response?.status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('token')
       window.location.href = '/login'
     }

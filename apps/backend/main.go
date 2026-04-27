@@ -85,12 +85,12 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	r.Post("/api/auth/register", authH.Register)
 	r.Post("/api/auth/login", authH.Login)
 
 	r.Group(func(r chi.Router) {
 		r.Use(jwtMW)
 		r.Get("/api/auth/me", authH.Me)
+		r.Post("/api/auth/change-password", authH.ChangePassword)
 
 		r.Get("/api/vineyards", vineyardH.List)
 		r.Post("/api/vineyards", vineyardH.Create)

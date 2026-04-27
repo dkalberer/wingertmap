@@ -3,8 +3,9 @@ import { useState, useEffect, useRef } from 'react'
 import {
   Box, AppBar, Toolbar, Typography, IconButton,
   Divider, Dialog, DialogTitle, DialogContent,
-  Drawer, SwipeableDrawer, useMediaQuery, useTheme, Fab,
-  Tabs, Tab, Badge,
+  Drawer, SwipeableDrawer, useMediaQuery, useTheme,
+  Badge, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader,
+  BottomNavigation, BottomNavigationAction, Button,
 } from '@mui/material'
 import LogoutIcon from '@mui/icons-material/Logout'
 import ListAltIcon from '@mui/icons-material/ListAlt'
@@ -17,7 +18,7 @@ import { useMapStore } from './store/mapStore'
 import { useVineyardStore } from './store/vineyardStore'
 import { useTaskStore } from './store/taskStore'
 import LoginForm from './components/Auth/LoginForm'
-import RegisterForm from './components/Auth/RegisterForm'
+import ChangePasswordForm from './components/Auth/ChangePasswordForm'
 import VineyardList from './components/Vineyard/VineyardList'
 import VineyardDetail from './components/Vineyard/VineyardDetail'
 import VineyardForm from './components/Vineyard/VineyardForm'
@@ -47,6 +48,7 @@ function MainLayout() {
 
   const [selected, setSelected] = useState<Vineyard | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [changePwOpen, setChangePwOpen] = useState(false)
   const [pendingBoundary, setPendingBoundary] = useState<GeoJSONPolygon | null>(null)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const [drawerTab, setDrawerTab] = useState(0) // 0 = Weinberge, 1 = Aufgaben
@@ -123,7 +125,19 @@ function MainLayout() {
 
   const openTaskCount = tasks.filter((t) => t.status !== 'erledigt').length
 
-  const vineyardTabContent = (
+  // Nav order: Weinberge(0), Aufgaben(1), Ernte(2) | Sorten(3), Personal(4)
+  const nutzungItems = [
+    { index: 0, label: 'Weinberge', icon: <ForestIcon fontSize="small" /> },
+    { index: 1, label: 'Aufgaben', icon: <Badge badgeContent={openTaskCount} color="error" max={99}><ListAltIcon fontSize="small" /></Badge> },
+    { index: 2, label: 'Ernte', icon: <AgricultureIcon fontSize="small" /> },
+  ]
+  const verwaltungItems = [
+    { index: 3, label: 'Sorten', icon: <GrapeIcon fontSize="small" /> },
+    { index: 4, label: 'Personal', icon: <PeopleIcon fontSize="small" /> },
+  ]
+
+  const tabContents: React.ReactNode[] = [
+    // 0: Weinberge
     <Box sx={{ overflow: 'auto', flex: 1 }}>
       <VineyardList onSelect={selectVineyard} />
       <Divider />
@@ -142,10 +156,8 @@ function MainLayout() {
           <VineyardDetail vineyard={selected} />
         </>
       )}
-    </Box>
-  )
-
-  const taskTabContent = (
+    </Box>,
+    // 1: Aufgaben
     <Box sx={{ overflow: 'auto', flex: 1 }}>
       <GlobalTasksPanel
         tasks={tasks}
@@ -160,75 +172,50 @@ function MainLayout() {
         onDelete={removeTask}
         onLocate={handleLocateTask}
       />
-    </Box>
-  )
-
-  const varietyTabContent = (
-    <Box sx={{ overflow: 'auto', flex: 1 }}>
-      <VarietyManager />
-    </Box>
-  )
-
-  const harvestTabContent = (
+    </Box>,
+    // 2: Ernte
     <Box sx={{ overflow: 'auto', flex: 1 }}>
       <HarvestPage vineyard={selected} />
-    </Box>
-  )
-
-  const personalTabContent = (
+    </Box>,
+    // 3: Sorten
+    <Box sx={{ overflow: 'auto', flex: 1 }}>
+      <VarietyManager />
+    </Box>,
+    // 4: Personal
     <Box sx={{ overflow: 'auto', flex: 1 }}>
       <PersonalPage vineyard={selected} />
+    </Box>,
+  ]
+
+  // Desktop: vertical nav list + content
+  const desktopDrawerContent = (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <List dense disablePadding>
+        <ListSubheader sx={{ lineHeight: '32px' }}>Nutzung</ListSubheader>
+        {nutzungItems.map(({ index, label, icon }) => (
+          <ListItemButton key={index} selected={drawerTab === index} onClick={() => setDrawerTab(index)}>
+            <ListItemIcon sx={{ minWidth: 36 }}>{icon}</ListItemIcon>
+            <ListItemText primary={label} />
+          </ListItemButton>
+        ))}
+        <Divider sx={{ my: 0.5 }} />
+        <ListSubheader sx={{ lineHeight: '32px' }}>Verwaltung</ListSubheader>
+        {verwaltungItems.map(({ index, label, icon }) => (
+          <ListItemButton key={index} selected={drawerTab === index} onClick={() => setDrawerTab(index)}>
+            <ListItemIcon sx={{ minWidth: 36 }}>{icon}</ListItemIcon>
+            <ListItemText primary={label} />
+          </ListItemButton>
+        ))}
+      </List>
+      <Divider />
+      {tabContents[drawerTab]}
     </Box>
   )
 
-  const drawerContent = (
+  // Mobile bottom sheet: only content, nav is BottomNavigation
+  const mobileDrawerContent = (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <Tabs
-        value={drawerTab}
-        onChange={(_, v) => setDrawerTab(v)}
-        variant="fullWidth"
-        sx={{ borderBottom: 1, borderColor: 'divider', minHeight: 44 }}
-      >
-        <Tab
-          icon={<ForestIcon fontSize="small" />}
-          iconPosition="start"
-          label="Weinberge"
-          sx={{ minHeight: 44, fontSize: '0.7rem' }}
-        />
-        <Tab
-          icon={
-            <Badge badgeContent={openTaskCount} color="error" max={99}>
-              <ListAltIcon fontSize="small" />
-            </Badge>
-          }
-          iconPosition="start"
-          label="Aufgaben"
-          sx={{ minHeight: 44, fontSize: '0.7rem' }}
-        />
-        <Tab
-          icon={<GrapeIcon fontSize="small" />}
-          iconPosition="start"
-          label="Sorten"
-          sx={{ minHeight: 44, fontSize: '0.7rem' }}
-        />
-        <Tab
-          icon={<AgricultureIcon fontSize="small" />}
-          iconPosition="start"
-          label="Ernte"
-          sx={{ minHeight: 44, fontSize: '0.7rem' }}
-        />
-        <Tab
-          icon={<PeopleIcon fontSize="small" />}
-          iconPosition="start"
-          label="Personal"
-          sx={{ minHeight: 44, fontSize: '0.7rem' }}
-        />
-      </Tabs>
-      {drawerTab === 0 && vineyardTabContent}
-      {drawerTab === 1 && taskTabContent}
-      {drawerTab === 2 && varietyTabContent}
-      {drawerTab === 3 && harvestTabContent}
-      {drawerTab === 4 && personalTabContent}
+      {tabContents[drawerTab]}
     </Box>
   )
 
@@ -240,7 +227,15 @@ function MainLayout() {
         <Toolbar variant="dense">
           <Typography variant="h6" sx={{ flexGrow: 1 }}>Wingertmap</Typography>
           {user && !isMobile && (
-            <Typography variant="body2" sx={{ mr: 2, opacity: 0.8 }}>{user.name}</Typography>
+            <Button
+              variant="text"
+              color="inherit"
+              size="small"
+              onClick={() => setChangePwOpen(true)}
+              sx={{ mr: 1, opacity: 0.8, textTransform: 'none' }}
+            >
+              {user.name}
+            </Button>
           )}
           <IconButton color="inherit" onClick={logout} title="Abmelden">
             <LogoutIcon />
@@ -248,7 +243,7 @@ function MainLayout() {
         </Toolbar>
       </AppBar>
 
-      {/* Desktop: permanent sidebar */}
+      {/* Desktop: permanent sidebar with vertical nav */}
       {!isMobile && (
         <Drawer
           variant="permanent"
@@ -258,11 +253,11 @@ function MainLayout() {
             '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box', top: `${APPBAR_HEIGHT}px` },
           }}
         >
-          {drawerContent}
+          {desktopDrawerContent}
         </Drawer>
       )}
 
-      {/* Mobile: swipeable bottom sheet */}
+      {/* Mobile: swipeable bottom sheet (content only, nav via BottomNavigation) */}
       {isMobile && (
         <SwipeableDrawer
           anchor="bottom"
@@ -274,9 +269,10 @@ function MainLayout() {
           ModalProps={{ keepMounted: true }}
           sx={{
             '& .MuiDrawer-paper': {
-              height: '70vh',
+              height: 'calc(70vh - 56px)',
               borderTopLeftRadius: 12,
               borderTopRightRadius: 12,
+              bottom: 56,
               top: 'auto',
             },
           }}
@@ -285,7 +281,7 @@ function MainLayout() {
           <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1, pb: 0.5 }}>
             <Box sx={{ width: 36, height: 4, borderRadius: 2, bgcolor: 'divider' }} />
           </Box>
-          {drawerContent}
+          {mobileDrawerContent}
         </SwipeableDrawer>
       )}
 
@@ -294,6 +290,7 @@ function MainLayout() {
         sx={{
           flexGrow: 1,
           mt: `${APPBAR_HEIGHT}px`,
+          mb: isMobile ? '56px' : 0,
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -309,19 +306,51 @@ function MainLayout() {
         />
       </Box>
 
-      {/* Mobile FAB to open drawer */}
+      {/* Mobile: Bottom Navigation Bar */}
       {isMobile && (
-        <Fab
-          color="primary"
-          size="medium"
-          onClick={() => { setDrawerTab(1); setMobileDrawerOpen(true) }}
-          sx={{ position: 'fixed', bottom: 24, right: 16, zIndex: 1000 }}
+        <BottomNavigation
+          value={drawerTab}
+          onChange={(_, newValue) => {
+            if (mobileDrawerOpen && newValue === drawerTab) {
+              setMobileDrawerOpen(false)
+            } else {
+              setDrawerTab(newValue)
+              setMobileDrawerOpen(true)
+            }
+          }}
+          sx={{
+            position: 'fixed',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            zIndex: 1100,
+            borderTop: 1,
+            borderColor: 'divider',
+          }}
         >
-          <Badge badgeContent={openTaskCount} color="error" max={99}>
-            <ListAltIcon />
-          </Badge>
-        </Fab>
+          <BottomNavigationAction label="Weinberge" icon={<ForestIcon />} />
+          <BottomNavigationAction
+            label="Aufgaben"
+            icon={
+              <Badge badgeContent={openTaskCount} color="error" max={99}>
+                <ListAltIcon />
+              </Badge>
+            }
+          />
+          <BottomNavigationAction label="Ernte" icon={<AgricultureIcon />} />
+          <BottomNavigationAction label="Sorten" icon={<GrapeIcon />} />
+          <BottomNavigationAction label="Personal" icon={<PeopleIcon />} />
+        </BottomNavigation>
       )}
+
+      <Dialog open={changePwOpen} onClose={() => setChangePwOpen(false)} maxWidth="xs" fullWidth>
+        <DialogTitle>Passwort ändern</DialogTitle>
+        <DialogContent>
+          <Box sx={{ pt: 1 }}>
+            <ChangePasswordForm onSuccess={() => setChangePwOpen(false)} />
+          </Box>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={addOpen} onClose={() => { setAddOpen(false); setPendingBoundary(null) }} maxWidth="xs" fullWidth>
         <DialogTitle>Neuer Wingert</DialogTitle>
@@ -339,28 +368,13 @@ function MainLayout() {
 }
 
 function AuthPage() {
-  const [showRegister, setShowRegister] = useState(false)
   const navigate = useNavigate()
 
   return (
     <Box sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: 'background.default' }}>
       <Box sx={{ bgcolor: 'background.paper', p: 4, borderRadius: 2, boxShadow: 3, width: '100%', maxWidth: 400 }}>
         <Typography variant="h4" color="primary" gutterBottom>Wingertmap</Typography>
-        {showRegister ? (
-          <>
-            <RegisterForm onSuccess={() => setShowRegister(false)} />
-            <Typography variant="body2" sx={{ mt: 2, cursor: 'pointer', color: 'text.secondary' }} onClick={() => setShowRegister(false)}>
-              Bereits registriert? Anmelden
-            </Typography>
-          </>
-        ) : (
-          <>
-            <LoginForm onSuccess={() => navigate('/')} />
-            <Typography variant="body2" sx={{ mt: 2, cursor: 'pointer', color: 'text.secondary' }} onClick={() => setShowRegister(true)}>
-              Noch kein Konto? Registrieren
-            </Typography>
-          </>
-        )}
+        <LoginForm onSuccess={() => navigate('/')} />
       </Box>
     </Box>
   )
