@@ -1,0 +1,19 @@
+backend:
+  replicas: 2
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+
+frontend:
+  replicas: 2
+
+cvService:
+  replicas: 2
+
+ingress:
+  tls: true
+  host: wingert.example.com

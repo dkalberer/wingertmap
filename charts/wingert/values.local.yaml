@@ -1,0 +1,25 @@
+backend:
+  image:
+    pullPolicy: Never
+  env:
+    JWT_SECRET: "local-dev-secret"
+    DB_PASSWORD: "local-dev-password"
+
+frontend:
+  image:
+    pullPolicy: Never
+
+cvService:
+  image:
+    pullPolicy: Never
+
+postgres:
+  env:
+    POSTGRES_PASSWORD: "local-dev-password"
+
+minio:
+  rootUser: "wingert"
+  rootPassword: "local-dev-minio"
+
+ingress:
+  host: wingert.localhost

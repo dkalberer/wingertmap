@@ -1,0 +1,133 @@
+version: '3'
+
+vars:
+  CLUSTER: wingert-local
+  NAMESPACE: wingert
+  DOCKER_ENV: DOCKER_HOST=unix://{{.HOME}}/.docker/run/docker.sock DOCKER_AUTH_CONFIG='{}' TESTCONTAINERS_RYUK_DISABLED=true
+
+tasks:
+  # ── Setup ──────────────────────────────────────────────────────────────────
+  setup:
+    desc: Lokales kind-Cluster erstellen (einmalig)
+    cmds:
+      - bash scripts/setup-local.sh
+
+  # ── Build & Deploy ─────────────────────────────────────────────────────────
+  build:
+    desc: Alle Docker-Images bauen
+    vars:
+      TAG:
+        sh: date +%s
+    cmds:
+      - docker build -t wingert/backend:{{.TAG}} -t wingert/backend:latest apps/backend
+      - docker build -t wingert/frontend:{{.TAG}} -t wingert/frontend:latest -f apps/frontend/Dockerfile .
+      - echo "{{.TAG}}" > .image-tag
+
+  load:
+    desc: Images in kind-Cluster laden und Pods neu starten
+    vars:
+      TAG:
+        sh: cat .image-tag
+    cmds:
+      - kind load docker-image wingert/backend:{{.TAG}} --name {{.CLUSTER}}
+      - kind load docker-image wingert/frontend:{{.TAG}} --name {{.CLUSTER}}
+      - kubectl rollout restart deployment -n {{.NAMESPACE}}
+      - kubectl rollout status deployment -n {{.NAMESPACE}} --timeout=120s
+
+  deploy:
+    desc: Helm-Release installieren/updaten
+    vars:
+      TAG:
+        sh: cat .image-tag
+    cmds:
+      - |
+        helm upgrade --install wingert ./charts/wingert \
+          -f charts/wingert/values.yaml \
+          -f charts/wingert/values.local.yaml \
+          --namespace {{.NAMESPACE}} --create-namespace \
+          --set backend.image.tag={{.TAG}} \
+          --set frontend.image.tag={{.TAG}} \
+          --force-conflicts
+
+  dev:
+    desc: Bauen, laden, deployen und Port-Forwards starten
+    cmds:
+      - task: build
+      - task: deploy
+      - task: load
+      - task: forward
+
+  # ── Tests ──────────────────────────────────────────────────────────────────
+  test:
+    desc: Alle Tests ausführen (Backend, Frontend)
+    cmds:
+      - task: test:backend
+      - task: test:frontend
+
+  test:backend:
+    desc: Go-Backend Tests (benötigt Docker)
+    dir: apps/backend
+    cmds:
+      - "{{.DOCKER_ENV}} go test ./... -timeout 300s"
+
+  test:frontend:
+    desc: Frontend Tests (Vitest + MSW)
+    dir: apps/frontend
+    cmds:
+      - pnpm test --run
+
+  # ── Lint & Build-Check ─────────────────────────────────────────────────────
+  lint:
+    desc: Linting aller Services
+    cmds:
+      - task: lint:backend
+      - task: lint:frontend
+
+  lint:backend:
+    desc: Go vet
+    dir: apps/backend
+    cmds:
+      - go vet ./...
+
+  lint:frontend:
+    desc: TypeScript type-check
+    dir: apps/frontend
+    cmds:
+      - pnpm lint
+
+  build:frontend:
+    desc: Frontend Production-Build
+    dir: apps/frontend
+    cmds:
+      - pnpm build
+
+  build:backend:
+    desc: Go-Binary bauen
+    dir: apps/backend
+    cmds:
+      - go build ./...
+
+  # ── Local Dev (ohne Cluster) ───────────────────────────────────────────────
+  dev:frontend:
+    desc: Vite Dev-Server starten (:5173)
+    dir: apps/frontend
+    cmds:
+      - pnpm dev
+
+  dev:backend:
+    desc: Go-Backend lokal starten (:8080)
+    dir: apps/backend
+    cmds:
+      - go run .
+
+  # ── Cluster-Utilities ─────────────────────────────────────────────────────
+  forward:
+    desc: Port-Forwards für Frontend, Backend und Postgres starten
+    cmds:
+      - bash scripts/port-forward.sh
+
+  # ── CI ─────────────────────────────────────────────────────────────────────
+  ci:
+    desc: Lokale CI-Pipeline (wie GitHub Actions, ohne push)
+    cmds:
+      - bash scripts/run-ci.sh

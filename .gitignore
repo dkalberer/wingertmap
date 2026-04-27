@@ -1,0 +1,27 @@
+node_modules/
+.pnpm-store/
+dist/
+build/
+*.env
+.env.local
+vendor/
+
+# Go
+apps/backend/server
+apps/backend/*.test
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+
+# K8s / Helm
+*.kubeconfig
+charts/wingert/charts/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.image-tag

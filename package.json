@@ -1,0 +1,10 @@
+{
+  "name": "wingert",
+  "private": true,
+  "scripts": {
+    "dev": "skaffold dev --profile=local --port-forward",
+    "build": "pnpm --filter frontend build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test"
+  }
+}

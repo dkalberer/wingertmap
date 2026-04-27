@@ -1,0 +1,54 @@
+global:
+  imageRegistry: ""
+
+backend:
+  image:
+    repository: wingert/backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  env:
+    PORT: "8080"
+    DB_HOST: wingert-postgres
+    DB_PORT: "5432"
+    DB_NAME: wingert
+    DB_USER: wingert
+
+frontend:
+  image:
+    repository: wingert/frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+  replicas: 1
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+
+postgres:
+  image: postgis/postgis:16-3.4
+  storage: 10Gi
+  env:
+    POSTGRES_DB: wingert
+    POSTGRES_USER: wingert
+    POSTGRES_PASSWORD: "change-me"
+
+minio:
+  image: minio/minio:latest
+  storage: 10Gi
+  bucket: wingert-photos
+  rootUser: "wingert"
+  rootPassword: "change-me"
+
+ingress:
+  enabled: true
+  host: wingert.local
+  className: nginx
+  tls: false

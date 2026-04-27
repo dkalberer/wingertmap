@@ -1,0 +1,37 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "wingert.fullname" . }}-db-backup
+  labels:
+    {{- include "wingert.labels" . | nindent 4 }}
+spec:
+  schedule: "0 2 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: backup
+              image: {{ .Values.postgres.image }}
+              env:
+                - name: PGPASSWORD
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ include "wingert.fullname" . }}-secrets
+                      key: db-password
+              command:
+                - /bin/sh
+                - -c
+                - |
+                  pg_dump -h {{ include "wingert.fullname" . }}-postgres \
+                    -U {{ .Values.postgres.env.POSTGRES_USER }} \
+                    -d {{ .Values.postgres.env.POSTGRES_DB }} \
+                    > /backups/wingert-$(date +%Y%m%d-%H%M%S).sql
+              volumeMounts:
+                - name: backups
+                  mountPath: /backups
+          volumes:
+            - name: backups
+              persistentVolumeClaim:
+                claimName: {{ include "wingert.fullname" . }}-backups
