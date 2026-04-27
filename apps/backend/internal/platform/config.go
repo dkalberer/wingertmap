@@ -11,6 +11,7 @@ type Config struct {
 	DBName     string
 	DBUser     string
 	DBPassword string
+	DBSSLMode  string
 	JWTSecret  string
 	Port       string
 
@@ -27,6 +28,7 @@ func LoadConfig() (*Config, error) {
 		DBName:     env("DB_NAME", "wingert"),
 		DBUser:     env("DB_USER", "wingert"),
 		DBPassword: os.Getenv("DB_PASSWORD"),
+		DBSSLMode:  env("DB_SSLMODE", "disable"),
 		JWTSecret:  os.Getenv("JWT_SECRET"),
 		Port:       env("PORT", "8080"),
 
