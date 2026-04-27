@@ -23,6 +23,7 @@ func NewMinioClient(cfg *Config) (*minio.Client, error) {
 		Creds:        credentials.NewStaticV4(cfg.S3AccessKey, cfg.S3SecretKey, ""),
 		Secure:       useSSL,
 		BucketLookup: minio.BucketLookupPath,
+		Region:       "auto",
 	})
 	if err != nil {
 		return nil, err
