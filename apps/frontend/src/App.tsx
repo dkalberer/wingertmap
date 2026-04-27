@@ -297,7 +297,7 @@ function MainLayout() {
         sx={{
           flexGrow: 1,
           mt: `${APPBAR_HEIGHT}px`,
-          mb: isMobile ? 'calc(56px + env(safe-area-inset-bottom))' : 0,
+          pb: isMobile ? 'calc(56px + env(safe-area-inset-bottom))' : 0,
           display: 'flex',
           flexDirection: 'column',
         }}
