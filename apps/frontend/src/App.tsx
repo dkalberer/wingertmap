@@ -8,6 +8,7 @@ import {
   BottomNavigation, BottomNavigationAction, Button,
 } from '@mui/material'
 import LogoutIcon from '@mui/icons-material/Logout'
+import ManageAccountsIcon from '@mui/icons-material/ManageAccounts'
 import ListAltIcon from '@mui/icons-material/ListAlt'
 import ForestIcon from '@mui/icons-material/Forest'
 import GrapeIcon from '@mui/icons-material/Spa'
@@ -40,6 +41,10 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 function MainLayout() {
   const logout = useAuthStore((s) => s.logout)
   const user = useAuthStore((s) => s.user)
+  const token = useAuthStore((s) => s.token)
+  const hydrate = useAuthStore((s) => s.hydrate)
+
+  useEffect(() => { hydrate() }, [hydrate])
   const { setCenter, setZoom } = useMapStore()
   const { vineyards } = useVineyardStore()
   const { tasks, loading: tasksLoading, error: tasksError, load: loadTasks, create: createTask, changeStatus, remove: removeTask } = useTaskStore()
@@ -239,6 +244,11 @@ function MainLayout() {
               {user.name}
             </Button>
           )}
+          {token && isMobile && (
+            <IconButton color="inherit" size="small" onClick={() => setChangePwOpen(true)} title="Passwort ändern" sx={{ mr: 0.5 }}>
+              <ManageAccountsIcon fontSize="small" />
+            </IconButton>
+          )}
           <IconButton color="inherit" onClick={logout} title="Abmelden">
             <LogoutIcon />
           </IconButton>
@@ -271,10 +281,10 @@ function MainLayout() {
           ModalProps={{ keepMounted: true }}
           sx={{
             '& .MuiDrawer-paper': {
-              height: 'calc(70vh - 56px)',
+              height: 'calc(70vh - 56px - env(safe-area-inset-bottom))',
               borderTopLeftRadius: 12,
               borderTopRightRadius: 12,
-              bottom: 56,
+              bottom: 'calc(56px + env(safe-area-inset-bottom))',
               top: 'auto',
             },
           }}
@@ -292,7 +302,7 @@ function MainLayout() {
         sx={{
           flexGrow: 1,
           mt: `${APPBAR_HEIGHT}px`,
-          mb: isMobile ? '56px' : 0,
+          mb: isMobile ? 'calc(56px + env(safe-area-inset-bottom))' : 0,
           display: 'flex',
           flexDirection: 'column',
         }}
@@ -329,6 +339,8 @@ function MainLayout() {
             zIndex: 1100,
             borderTop: 1,
             borderColor: 'divider',
+            height: 'calc(56px + env(safe-area-inset-bottom))',
+            paddingBottom: 'env(safe-area-inset-bottom)',
           }}
         >
           <BottomNavigationAction label="Weinberge" icon={<ForestIcon />} />
