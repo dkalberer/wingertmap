@@ -23,8 +23,7 @@ import RowLayer from './RowLayer'
 import VineTaskDialog from '../Tasks/VineTaskDialog'
 import type { GeoJSONPolygon, GeoJSONLineString, GeoJSONPoint, Row, Task, Vine, Vineyard } from '../../types'
 import { listRows, createRow } from '../../api/rows'
-import { listPhotos } from '../../api/photos'
-import type { TaskPhoto } from '../../api/photos'
+import { updateVineyard } from '../../api/vineyards'
 import 'leaflet/dist/leaflet.css'
 
 function FlyToCenter({ center, zoom }: { center: [number, number]; zoom: number }) {
@@ -60,40 +59,13 @@ const taskIcon = L.divIcon({
 
 import { Marker } from 'react-leaflet'
 
-function TaskMarker({ task }: { task: Task }) {
-  const [photos, setPhotos] = useState<TaskPhoto[]>([])
-  const [loaded, setLoaded] = useState(false)
-
-  function handleOpen() {
-    if (loaded) return
-    setLoaded(true)
-    listPhotos(task.id).then(setPhotos).catch(() => {})
-  }
-
+function TaskMarker({ task, onTaskSelect }: { task: Task; onTaskSelect?: (t: Task) => void }) {
   return (
     <Marker
       position={[task.location!.coordinates[1], task.location!.coordinates[0]]}
       icon={taskIcon}
-      eventHandlers={{ popupopen: handleOpen }}
-    >
-      <Popup minWidth={160}>
-        <strong style={{ fontSize: 13 }}>{task.title}</strong>
-        {task.notes && <p style={{ fontSize: 12, margin: '4px 0 0', color: '#555' }}>{task.notes}</p>}
-        {photos.length > 0 && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 6 }}>
-            {photos.map((p) => (
-              <a key={p.id} href={p.url} target="_blank" rel="noreferrer">
-                <img
-                  src={p.url}
-                  alt=""
-                  style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 4, display: 'block' }}
-                />
-              </a>
-            ))}
-          </div>
-        )}
-      </Popup>
-    </Marker>
+      eventHandlers={{ click: () => onTaskSelect?.(task) }}
+    />
   )
 }
 
@@ -105,6 +77,7 @@ interface Props {
   pickingLocation?: boolean
   onLocationPicked?: (p: GeoJSONPoint) => void
   onFlyTo?: (handler: (lat: number, lng: number, zoom?: number) => void) => void
+  onTaskSelect?: (task: Task) => void
 }
 
 type BaseLayer = 'karte' | 'luftbild'
@@ -173,12 +146,120 @@ function ElevationQuery() {
   return null
 }
 
+function VineyardActionPanel({ vineyard, onEdit, onClose }: {
+  vineyard: Vineyard
+  onEdit: () => void
+  onClose: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => { if (ref.current) L.DomEvent.disableClickPropagation(ref.current) }, [])
+  return (
+    <div ref={ref} style={{
+      position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+      zIndex: 1000, background: '#fff', borderRadius: 8, padding: '10px 14px',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', gap: 10,
+      fontSize: 13, whiteSpace: 'nowrap',
+    }}>
+      <strong>{vineyard.name}</strong>
+      <span style={{ borderLeft: '1px solid #ddd', height: 20 }} />
+      {vineyard.boundary && (
+        <button onClick={onEdit} style={vBtnStyle('#1d4ed8')}>✎ Grenze bearbeiten</button>
+      )}
+      <button onClick={onClose} style={{ ...vBtnStyle('#6b7280'), padding: '3px 6px' }}>✕</button>
+    </div>
+  )
+}
+
+function vBtnStyle(bg: string): import('react').CSSProperties {
+  return { background: bg, color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 500 }
+}
+
+function VineyardBoundaries({ vineyards, selectedVineyardId, onVineyardClick, onBoundaryUpdated, pickingLocation }: {
+  vineyards: Vineyard[]
+  selectedVineyardId?: string | null
+  onVineyardClick?: (v: Vineyard) => void
+  onBoundaryUpdated: () => void
+  pickingLocation: boolean
+}) {
+  const map = useMap()
+  const [panelVineyard, setPanelVineyard] = useState<Vineyard | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+
+  function handlePolygonClick(v: Vineyard) {
+    if (pickingLocation) return
+    if (v.id === selectedVineyardId) {
+      setPanelVineyard((prev) => prev?.id === v.id ? null : v)
+    } else {
+      setPanelVineyard(null)
+      onVineyardClick?.(v)
+    }
+  }
+
+  async function handleEdit(v: Vineyard) {
+    if (!v.boundary) return
+    setPanelVineyard(null)
+    setEditingId(v.id)
+
+    const coords = v.boundary.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number])
+    const poly = L.polygon(coords, { color: '#1d4ed8', weight: 2 }).addTo(map)
+    const editHandler = new (L.EditToolbar.Edit as any)(map, { featureGroup: L.featureGroup([poly]) })
+    editHandler.enable()
+
+    map.once('click', async () => {
+      editHandler.save()
+      editHandler.disable()
+      const rings = poly.getLatLngs() as L.LatLng[][]
+      map.removeLayer(poly)
+      setEditingId(null)
+      const ring = rings[0] as L.LatLng[]
+      if (ring && ring.length >= 3) {
+        const closed = [...ring.map((ll): [number, number] => [ll.lng, ll.lat]), [ring[0].lng, ring[0].lat] as [number, number]]
+        const boundary: GeoJSONPolygon = { type: 'Polygon', coordinates: [closed] }
+        await updateVineyard(v.id, { name: v.name, description: v.description, boundary })
+        onBoundaryUpdated()
+      }
+    })
+  }
+
+  return (
+    <>
+      {vineyards.map((v) => {
+        if (!v.boundary || editingId === v.id) return null
+        const positions = v.boundary.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number])
+        const isSelected = v.id === selectedVineyardId
+        return (
+          <Polygon
+            key={v.id}
+            positions={positions}
+            pathOptions={{
+              color: isSelected ? '#15803d' : '#6b7280',
+              fillColor: isSelected ? '#15803d' : '#6b7280',
+              fillOpacity: isSelected ? 0.15 : 0.08,
+              weight: isSelected ? 2.5 : 1.5,
+            }}
+            eventHandlers={{ click: () => handlePolygonClick(v) }}
+          >
+            <LeafletTooltip>{v.name}</LeafletTooltip>
+          </Polygon>
+        )
+      })}
+      {panelVineyard && (
+        <VineyardActionPanel
+          vineyard={panelVineyard}
+          onEdit={() => handleEdit(panelVineyard)}
+          onClose={() => setPanelVineyard(null)}
+        />
+      )}
+    </>
+  )
+}
+
 export default function VineyardMap({
   onDrawComplete, selectedVineyardId, onVineyardClick,
-  tasks = [], pickingLocation = false, onLocationPicked, onFlyTo,
+  tasks = [], pickingLocation = false, onLocationPicked, onFlyTo, onTaskSelect,
 }: Props) {
   const { center, zoom, drawingMode, setDrawingMode } = useMapStore()
-  const { vineyards } = useVineyardStore()
+  const { vineyards, load: reloadVineyards } = useVineyardStore()
   const { position, error: gpsError, startWatching, stopWatching } = useGPS()
   const [gpsActive, setGpsActive] = useState(false)
   const [baseLayer, setBaseLayer] = useState<BaseLayer>('karte')
@@ -250,30 +331,17 @@ export default function VineyardMap({
         ))}
         {activeOverlays.includes('hoehe') && !pickingLocation && <ElevationQuery />}
 
-        {vineyards.map((v) => {
-          if (!v.boundary) return null
-          const positions = v.boundary.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number])
-          const isSelected = v.id === selectedVineyardId
-          return (
-            <Polygon
-              key={v.id}
-              positions={positions}
-              pathOptions={{
-                color: isSelected ? '#15803d' : '#6b7280',
-                fillColor: isSelected ? '#15803d' : '#6b7280',
-                fillOpacity: isSelected ? 0.15 : 0.08,
-                weight: isSelected ? 2.5 : 1.5,
-              }}
-              eventHandlers={{ click: () => onVineyardClick?.(v) }}
-            >
-              <LeafletTooltip>{v.name}</LeafletTooltip>
-            </Polygon>
-          )
-        })}
+        <VineyardBoundaries
+          vineyards={vineyards}
+          selectedVineyardId={selectedVineyardId}
+          onVineyardClick={onVineyardClick}
+          onBoundaryUpdated={reloadVineyards}
+          pickingLocation={pickingLocation}
+        />
 
         {/* Task markers */}
         {tasks.filter((t) => t.location).map((t) => (
-          <TaskMarker key={t.id} task={t} />
+          <TaskMarker key={t.id} task={t} onTaskSelect={onTaskSelect} />
         ))}
 
         <DrawingTools onDrawComplete={handleDrawComplete} />

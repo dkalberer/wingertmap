@@ -10,7 +10,7 @@ const tasks: Task[] = [
 
 describe('TaskList', () => {
   it('renders all tasks with translated labels', () => {
-    render(<TaskList tasks={tasks} onStatusChange={vi.fn()} />)
+    render(<TaskList tasks={tasks} onStatusChange={vi.fn()} onSelect={vi.fn()} />)
     // titles appear as "✂️ Beschnitt" / "🍇 Ernte" inside the h6 — use partial match
     expect(screen.getByText(/Beschnitt/)).toBeInTheDocument()
     // erledigt group header is rendered even if collapsed
@@ -18,7 +18,7 @@ describe('TaskList', () => {
   })
 
   it('shows empty state when no tasks', () => {
-    render(<TaskList tasks={[]} onStatusChange={vi.fn()} />)
+    render(<TaskList tasks={[]} onStatusChange={vi.fn()} onSelect={vi.fn()} />)
     expect(screen.getByText(/keine aufgaben/i)).toBeInTheDocument()
   })
 })

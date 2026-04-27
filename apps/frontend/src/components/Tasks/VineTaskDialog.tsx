@@ -17,7 +17,7 @@ interface Props {
 
 export default function VineTaskDialog({ vine, onClose }: Props) {
   const [showForm, setShowForm] = useState(false)
-  const { tasks, loading, error, create } = useTaskStore()
+  const { tasks, loading, error, create, changeStatus } = useTaskStore()
 
   const vineTasks = vine ? tasks.filter((t) => t.vineId === vine.id) : []
 
@@ -35,7 +35,7 @@ export default function VineTaskDialog({ vine, onClose }: Props) {
         {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
         {!loading && (
           <Box>
-            <TaskList tasks={vineTasks} />
+            <TaskList tasks={vineTasks} onStatusChange={changeStatus} onSelect={() => {}} />
             <Divider sx={{ my: 1.5 }} />
             {showForm ? (
               <TaskForm onSubmit={handleCreate} onCancel={() => setShowForm(false)} />

@@ -1,13 +1,12 @@
 import { Box, Typography, Collapse } from '@mui/material'
 import { useState } from 'react'
 import type { Task, TaskStatus } from '../../types'
-import TaskCard from './TaskCard'
+import TaskRow from './TaskRow'
 
 interface Props {
   tasks: Task[]
-  onStatusChange?: (id: string, status: TaskStatus) => void
-  onLocate?: (task: Task) => void
-  onDelete?: (id: string) => void
+  onStatusChange: (id: string, status: TaskStatus) => void
+  onSelect: (task: Task) => void
 }
 
 interface Group {
@@ -31,7 +30,7 @@ function getDateGroup(task: Task): 'overdue' | 'today' | 'week' | 'later' | 'don
   return 'later'
 }
 
-function CollapsibleGroup({ group }: { group: Group & { onStatusChange?: Props['onStatusChange']; onLocate?: Props['onLocate']; onDelete?: Props['onDelete'] } }) {
+function CollapsibleGroup({ group }: { group: Group & { onStatusChange: Props['onStatusChange']; onSelect: Props['onSelect'] } }) {
   const [open, setOpen] = useState(group.defaultOpen)
 
   return (
@@ -63,14 +62,13 @@ function CollapsibleGroup({ group }: { group: Group & { onStatusChange?: Props['
         <Typography variant="caption" color="text.disabled">{open ? '▲' : '▼'}</Typography>
       </Box>
       <Collapse in={open}>
-        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, pb: 1 }}>
+        <Box sx={{ pb: 0.5 }}>
           {group.tasks.map((t) => (
-            <TaskCard
+            <TaskRow
               key={t.id}
               task={t}
-              onStatusChange={group.onStatusChange ?? (() => {})}
-              onLocate={group.onLocate}
-              onDelete={group.onDelete}
+              onStatusChange={group.onStatusChange}
+              onSelect={group.onSelect}
             />
           ))}
         </Box>
@@ -79,7 +77,7 @@ function CollapsibleGroup({ group }: { group: Group & { onStatusChange?: Props['
   )
 }
 
-export default function TaskList({ tasks, onStatusChange, onLocate, onDelete }: Props) {
+export default function TaskList({ tasks, onStatusChange, onSelect }: Props) {
   if (tasks.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary" sx={{ py: 1 }}>
@@ -107,7 +105,7 @@ export default function TaskList({ tasks, onStatusChange, onLocate, onDelete }: 
       {groups.map((group) => (
         <CollapsibleGroup
           key={group.key}
-          group={{ ...group, onStatusChange, onLocate, onDelete }}
+          group={{ ...group, onStatusChange, onSelect }}
         />
       ))}
     </Box>

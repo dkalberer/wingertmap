@@ -52,6 +52,7 @@ function MainLayout() {
   const [pendingBoundary, setPendingBoundary] = useState<GeoJSONPolygon | null>(null)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
   const [drawerTab, setDrawerTab] = useState(0) // 0 = Weinberge, 1 = Aufgaben
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
 
   const [pickingLocation, setPickingLocation] = useState(false)
   const [pendingLocation, setPendingLocation] = useState<GeoJSONPoint | null>(null)
@@ -110,6 +111,15 @@ function MainLayout() {
     }
     flyToRef.current?.(lat, lng, 20)
     if (isMobile) setMobileDrawerOpen(false)
+    setSelectedTask(null)
+  }
+
+  function handleTaskSelect(task: Task | null) {
+    setSelectedTask(task)
+    if (task) {
+      setDrawerTab(1)
+      if (isMobile) setMobileDrawerOpen(true)
+    }
   }
 
   async function handleCreateTask(params: Parameters<typeof createTask>[0]) {
@@ -140,16 +150,6 @@ function MainLayout() {
     // 0: Weinberge
     <Box sx={{ overflow: 'auto', flex: 1 }}>
       <VineyardList onSelect={selectVineyard} />
-      <Divider />
-      <Box sx={{ p: 1 }}>
-        <Typography
-          variant="caption"
-          sx={{ cursor: 'pointer', color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}
-          onClick={() => setAddOpen(true)}
-        >
-          + Wingert hinzufügen
-        </Typography>
-      </Box>
       {selected && (
         <>
           <Divider />
@@ -164,6 +164,7 @@ function MainLayout() {
         loading={tasksLoading}
         error={tasksError}
         pendingLocation={pendingLocation}
+        selectedTask={selectedTask}
         onStartPicking={handleStartPicking}
         onCancelPicking={() => { setPickingLocation(false); setPendingLocation(null) }}
         onGPSLocation={setPendingLocation}
@@ -171,6 +172,7 @@ function MainLayout() {
         onStatusChange={changeStatus}
         onDelete={removeTask}
         onLocate={handleLocateTask}
+        onTaskSelect={handleTaskSelect}
       />
     </Box>,
     // 2: Ernte
@@ -303,6 +305,7 @@ function MainLayout() {
           pickingLocation={pickingLocation}
           onLocationPicked={handleLocationPicked}
           onFlyTo={(handler) => { flyToRef.current = handler }}
+          onTaskSelect={handleTaskSelect}
         />
       </Box>
 

@@ -84,10 +84,6 @@ DELETE /api/pruning/{id}
   - Gibt auf einen Blick: hat weniger Augen wirklich mehr Oechsle gebracht?
 
 ---
-TODO:
-- Lidar höhenmap einbaeun?
-
----
 
 ## Implementierungsreihenfolge
 
