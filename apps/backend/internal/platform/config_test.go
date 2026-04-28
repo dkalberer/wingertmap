@@ -19,7 +19,7 @@ func TestConfigDefaults(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "localhost", cfg.DBHost)
 	assert.Equal(t, "5432", cfg.DBPort)
-	assert.Equal(t, "wingert", cfg.DBName)
+	assert.Equal(t, "postgres", cfg.DBName)
 	assert.Equal(t, "8080", cfg.Port)
 }
 
