@@ -66,6 +66,9 @@ func MigrationsDir() string {
 // RunMigrations executes all SQL files in the migrations directory in order.
 func RunMigrations(t *testing.T, db *gorm.DB) {
 	t.Helper()
+	if err := db.Exec("CREATE SCHEMA IF NOT EXISTS public").Error; err != nil {
+		t.Fatalf("create schema: %v", err)
+	}
 	dir := MigrationsDir()
 	entries, err := os.ReadDir(dir)
 	if err != nil {

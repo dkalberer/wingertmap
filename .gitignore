@@ -25,3 +25,5 @@ charts/wingert/charts/
 .vscode/
 *.swp
 .image-tag
+
+backups

@@ -5,6 +5,7 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
 COPY apps/frontend/package.json ./apps/frontend/
 RUN pnpm install --no-frozen-lockfile --filter frontend
 COPY apps/frontend/src ./apps/frontend/src
+COPY apps/frontend/public ./apps/frontend/public
 COPY apps/frontend/index.html apps/frontend/tsconfig.json apps/frontend/tsconfig.tsbuildinfo apps/frontend/vite.config.ts ./apps/frontend/
 RUN pnpm --filter frontend build
 

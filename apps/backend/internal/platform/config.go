@@ -12,6 +12,7 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	DBSSLMode  string
+	DBSchema   string
 	JWTSecret  string
 	Port       string
 
@@ -25,10 +26,11 @@ func LoadConfig() (*Config, error) {
 	c := &Config{
 		DBHost:     env("DB_HOST", "localhost"),
 		DBPort:     env("DB_PORT", "5432"),
-		DBName:     env("DB_NAME", "wingert"),
-		DBUser:     env("DB_USER", "wingert"),
+		DBName:     env("DB_NAME", "postgres"),
+		DBUser:     env("DB_USER", "postgres"),
 		DBPassword: os.Getenv("DB_PASSWORD"),
 		DBSSLMode:  env("DB_SSLMODE", "disable"),
+		DBSchema:   env("DB_SCHEMA", "wingert"),
 		JWTSecret:  os.Getenv("JWT_SECRET"),
 		Port:       env("PORT", "8080"),
 

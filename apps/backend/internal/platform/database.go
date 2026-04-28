@@ -12,15 +12,18 @@ import (
 
 func NewDB(cfg *Config) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBSSLMode,
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s search_path=%s,public",
+		cfg.DBHost, cfg.DBPort, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBSSLMode, cfg.DBSchema,
 	)
 	return gorm.Open(gormpg.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
 }
 
-func RunMigrations(db *gorm.DB, migrationsDir string) error {
+func RunMigrations(db *gorm.DB, migrationsDir string, schema string) error {
+	if err := db.Exec("CREATE SCHEMA IF NOT EXISTS " + schema).Error; err != nil {
+		return fmt.Errorf("create schema %s: %w", schema, err)
+	}
 	entries, err := os.ReadDir(migrationsDir)
 	if err != nil {
 		return fmt.Errorf("read migrations dir: %w", err)

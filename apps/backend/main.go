@@ -34,7 +34,7 @@ func main() {
 
 	_, file, _, _ := runtime.Caller(0)
 	migrationsDir := filepath.Join(filepath.Dir(file), "migrations")
-	if err := platform.RunMigrations(db, migrationsDir); err != nil {
+	if err := platform.RunMigrations(db, migrationsDir, cfg.DBSchema); err != nil {
 		log.Fatalf("migrations: %v", err)
 	}
 

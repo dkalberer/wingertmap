@@ -18,7 +18,7 @@ backend:
     PORT: "8080"
     DB_HOST: wingert-postgres
     DB_PORT: "5432"
-    DB_NAME: wingert
+    DB_NAME: postgres
     DB_USER: wingert
 
 frontend:
