@@ -2,7 +2,9 @@ import { Box, Divider, Typography } from '@mui/material'
 import type { Vineyard } from '../../types'
 import WeatherWidget from './WeatherWidget'
 import ProtectionBadge from './ProtectionBadge'
+import SprayHistorySection from './SprayHistorySection'
 import JournalSection from './JournalSection'
+import PruningSection from './PruningSection'
 
 interface Props {
   vineyard: Vineyard
@@ -22,6 +24,10 @@ export default function VineyardDetail({ vineyard }: Props) {
         <ProtectionBadge vineyardId={vineyard.id} />
       </Box>
 
+      <Box sx={{ mt: 1.5 }}>
+        <SprayHistorySection vineyardId={vineyard.id} />
+      </Box>
+
       <Divider sx={{ my: 2 }} />
 
       <Typography variant="overline" color="text.secondary" component="p" sx={{ mb: 1 }}>
@@ -32,6 +38,10 @@ export default function VineyardDetail({ vineyard }: Props) {
       <Divider sx={{ my: 2 }} />
 
       <JournalSection vineyardId={vineyard.id} />
+
+      <Divider sx={{ my: 2 }} />
+
+      <PruningSection vineyard={vineyard} />
     </Box>
   )
 }

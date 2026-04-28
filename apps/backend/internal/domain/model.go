@@ -138,6 +138,29 @@ type VintageJournal struct {
 	UpdatedAt  time.Time `json:"updatedAt"`
 }
 
+// --- PruningRecord ---
+
+type SchnittTyp string
+
+const (
+	SchnittTypBogen     SchnittTyp = "Bogenschnitt"
+	SchnittTypZapfen    SchnittTyp = "Zapfenschnitt"
+	SchnittTypMinimal   SchnittTyp = "Minimalschnitt"
+	SchnittTypSonstiges SchnittTyp = "Sonstiges"
+)
+
+type PruningRecord struct {
+	ID           uuid.UUID  `json:"id"`
+	VineyardID   uuid.UUID  `json:"vineyardId"`
+	Year         int        `json:"year"`
+	PruningDate  time.Time  `json:"pruningDate"`
+	SchnittTyp   SchnittTyp `json:"schnittTyp"`
+	AugenProRebe *float64   `json:"augenProRebe,omitempty"`
+	Notes        string     `json:"notes,omitempty"`
+	CreatedBy    uuid.UUID  `json:"createdBy"`
+	CreatedAt    time.Time  `json:"createdAt"`
+}
+
 // --- Task ---
 
 type TaskStatus string

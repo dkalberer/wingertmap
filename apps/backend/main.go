@@ -51,6 +51,7 @@ func main() {
 	taskStore := store.NewTaskStore(db)
 	varietyStore := store.NewGrapeVarietyStore(db)
 	harvestStore := store.NewHarvestStore(db)
+	pruningStore := store.NewPruningStore(db)
 	journalStore := store.NewJournalStore(db)
 	employeeStore := store.NewEmployeeStore(db)
 	workTypeStore := store.NewWorkTypeStore(db)
@@ -66,6 +67,7 @@ func main() {
 	taskH := handler.NewTaskHandler(taskStore)
 	varietyH := handler.NewGrapeVarietyHandler(varietyStore)
 	harvestH := handler.NewHarvestHandler(harvestStore)
+	pruningH := handler.NewPruningHandler(pruningStore)
 	journalH := handler.NewJournalHandler(journalStore)
 	employeeH := handler.NewEmployeeHandler(employeeStore)
 	workTypeH := handler.NewWorkTypeHandler(workTypeStore)
@@ -123,6 +125,11 @@ func main() {
 		r.Post("/api/vineyards/{vineyardID}/harvests", harvestH.Create)
 		r.Put("/api/harvests/{id}", harvestH.Update)
 		r.Delete("/api/harvests/{id}", harvestH.Delete)
+
+		r.Get("/api/vineyards/{vineyardID}/pruning", pruningH.List)
+		r.Post("/api/vineyards/{vineyardID}/pruning", pruningH.Create)
+		r.Put("/api/pruning/{id}", pruningH.Update)
+		r.Delete("/api/pruning/{id}", pruningH.Delete)
 
 		r.Get("/api/vineyards/{id}/weather", weatherH.Weather)
 		r.Get("/api/vineyards/{id}/plant-protection-status", weatherH.PlantProtectionStatus)

@@ -198,6 +198,21 @@ export interface VintageJournal {
   updatedAt: string
 }
 
+// PruningRecord
+export type SchnittTyp = 'Bogenschnitt' | 'Zapfenschnitt' | 'Minimalschnitt' | 'Sonstiges'
+
+export interface PruningRecord {
+  id: string
+  vineyardId: string
+  year: number
+  pruningDate: string
+  schnittTyp: SchnittTyp
+  augenProRebe?: number
+  notes?: string
+  createdBy: string
+  createdAt: string
+}
+
 // API response wrappers
 export interface ApiError {
   error: string

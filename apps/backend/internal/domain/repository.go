@@ -122,6 +122,34 @@ type VintageJournalRepository interface {
 	Upsert(vineyardID uuid.UUID, year int, notes string, createdBy uuid.UUID) (*VintageJournal, error)
 }
 
+// PruningCreateParams holds all fields for creating a pruning record.
+type PruningCreateParams struct {
+	VineyardID   uuid.UUID
+	Year         int
+	PruningDate  string // YYYY-MM-DD
+	SchnittTyp   SchnittTyp
+	AugenProRebe *float64
+	Notes        string
+	CreatedBy    uuid.UUID
+}
+
+// PruningUpdateParams holds updatable fields for a pruning record.
+type PruningUpdateParams struct {
+	Year         int
+	PruningDate  string
+	SchnittTyp   SchnittTyp
+	AugenProRebe *float64
+	Notes        string
+}
+
+// PruningRepository defines all persistence operations for pruning records.
+type PruningRepository interface {
+	Create(p PruningCreateParams) (*PruningRecord, error)
+	ListByVineyard(vineyardID uuid.UUID) ([]PruningRecord, error)
+	Update(id uuid.UUID, p PruningUpdateParams) (*PruningRecord, error)
+	Delete(id uuid.UUID) error
+}
+
 // TaskCreateParams holds all fields for creating a task.
 type TaskCreateParams struct {
 	VineID     *uuid.UUID
