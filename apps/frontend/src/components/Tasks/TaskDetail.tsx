@@ -2,12 +2,14 @@ import { useRef, useState } from 'react'
 import {
   Box, Typography, IconButton, ToggleButton, ToggleButtonGroup,
   Chip, Divider, Button, ImageList, ImageListItem, CircularProgress, Alert,
+  Dialog,
 } from '@mui/material'
 import ArrowBackIcon from '@mui/icons-material/ArrowBack'
 import PlaceIcon from '@mui/icons-material/Place'
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday'
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate'
 import DeleteIcon from '@mui/icons-material/Delete'
+import CloseIcon from '@mui/icons-material/Close'
 import type { Task, TaskStatus } from '../../types'
 import {
   TASK_STATUS_LABELS, CATEGORY_LABELS, SEVERITY_LABELS,
@@ -32,6 +34,7 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [lightboxPhoto, setLightboxPhoto] = useState<TaskPhoto | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const overdue = isOverdue(task)
 
@@ -68,7 +71,8 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
 
       <Box sx={{ flex: 1, overflow: 'auto', px: 2, pb: 2 }}>
         <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3, mt: 0.5, mb: 2 }}>
-          {iconForCategory(task.category)} {task.title || labelForCategory(task.category)}
+          <span aria-hidden="true">{iconForCategory(task.category)} </span>
+          {task.title || labelForCategory(task.category)}
         </Typography>
 
         <ToggleButtonGroup
@@ -124,7 +128,7 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
 
           {task.dueDate && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <CalendarTodayIcon sx={{ fontSize: 16, color: overdue ? 'error.main' : 'text.secondary' }} />
+              <CalendarTodayIcon sx={{ fontSize: 16, color: overdue ? 'error.main' : 'text.secondary' }} aria-hidden="true" />
               <Typography
                 variant="body2"
                 sx={{ color: overdue ? 'error.main' : 'text.primary', fontWeight: overdue ? 600 : 400 }}
@@ -168,18 +172,28 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
             {photos.length > 0 && (
               <ImageList cols={3} rowHeight={80} sx={{ mt: 0.5, mb: 0 }}>
                 {photos.map((p) => (
-                  <ImageListItem key={p.id} sx={{ borderRadius: 1, overflow: 'hidden', cursor: 'pointer' }} onClick={() => window.open(p.url, '_blank')}>
+                  <ImageListItem
+                    key={p.id}
+                    sx={{
+                      borderRadius: 1,
+                      overflow: 'hidden',
+                      cursor: 'zoom-in',
+                      '&:hover': { opacity: 0.85 },
+                    }}
+                    onClick={() => setLightboxPhoto(p)}
+                  >
                     <img src={p.url} alt="" style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
                   </ImageListItem>
                 ))}
               </ImageList>
             )}
             {uploadError && (
-              <Alert severity="error" onClose={() => setUploadError(null)} sx={{ mt: 0.5, py: 0 }}>
+              <Alert severity="error" role="alert" onClose={() => setUploadError(null)} sx={{ mt: 0.5, py: 0 }}>
                 {uploadError}
               </Alert>
             )}
-            <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={handleUpload} />
+            {/* No capture="environment" — lets users choose camera OR photo library */}
+            <input ref={fileRef} type="file" accept="image/*" hidden onChange={handleUpload} />
             <Button
               size="small"
               startIcon={uploading ? <CircularProgress size={14} /> : <AddPhotoAlternateIcon />}
@@ -227,6 +241,38 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
           </Box>
         )}
       </Box>
+
+      {/* Photo lightbox — opens in a dialog instead of raw new tab */}
+      <Dialog
+        open={!!lightboxPhoto}
+        onClose={() => setLightboxPhoto(null)}
+        maxWidth="md"
+        slotProps={{ backdrop: { sx: { bgcolor: 'rgba(0,0,0,0.85)' } } }}
+        sx={{ '& .MuiDialog-paper': { bgcolor: 'transparent', boxShadow: 'none', overflow: 'visible' } }}
+      >
+        <Box sx={{ position: 'relative' }}>
+          <IconButton
+            onClick={() => setLightboxPhoto(null)}
+            aria-label="Schließen"
+            sx={{
+              position: 'absolute',
+              top: -40,
+              right: 0,
+              color: 'white',
+              '&:hover': { bgcolor: 'rgba(255,255,255,0.15)' },
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+          {lightboxPhoto && (
+            <img
+              src={lightboxPhoto.url}
+              alt=""
+              style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 8, display: 'block' }}
+            />
+          )}
+        </Box>
+      </Dialog>
     </Box>
   )
 }

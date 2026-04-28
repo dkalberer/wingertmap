@@ -95,13 +95,19 @@ export default function GlobalTasksPanel({
       {loading ? (
         <CircularProgress size={18} sx={{ display: 'block', mx: 'auto', my: 1 }} />
       ) : (
-        <TaskList tasks={tasks} onStatusChange={onStatusChange} onSelect={onTaskSelect} />
+        <TaskList
+          tasks={tasks}
+          onStatusChange={onStatusChange}
+          onSelect={onTaskSelect}
+          onNew={() => setDialogOpen(true)}
+        />
       )}
 
       <Divider sx={{ my: 1.5 }} />
 
       <Stack spacing={0.75}>
-        {gpsError && <Alert severity="warning" sx={{ py: 0 }}>{gpsError}</Alert>}
+        {/* role="alert" ensures screen readers announce GPS errors immediately */}
+        {gpsError && <Alert severity="warning" role="alert" sx={{ py: 0 }}>{gpsError}</Alert>}
         <Button
           size="small"
           startIcon={<AddIcon />}

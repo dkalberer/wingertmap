@@ -77,32 +77,7 @@ export default function TaskForm({ location, vineyardId, onSubmit, onCancel }: P
     <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {error && <Alert severity="error" role="alert">{error}</Alert>}
 
-      <TextField
-        id="task-title"
-        label="Titel"
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        required
-        size="small"
-        autoFocus
-      />
-
-      <Box>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-          Art
-        </Typography>
-        <ToggleButtonGroup
-          value={recordType}
-          exclusive
-          onChange={(_, v) => { if (v) setRecordType(v) }}
-          size="small"
-          fullWidth
-        >
-          <ToggleButton value="aufgabe" sx={{ minHeight: 44 }}>Aufgabe</ToggleButton>
-          <ToggleButton value="beobachtung" sx={{ minHeight: 44 }}>Beobachtung</ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
+      {/* Kategorie first — primary organizational choice */}
       <Box>
         <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
           Kategorie
@@ -127,13 +102,31 @@ export default function TaskForm({ location, vineyardId, onSubmit, onCancel }: P
                 lineHeight: 1.2,
               }}
             >
-              <span style={{ fontSize: '1.25rem' }}>{CATEGORY_ICONS[c]}</span>
+              <span aria-hidden="true" style={{ fontSize: '1.25rem' }}>{CATEGORY_ICONS[c]}</span>
               {CATEGORY_LABELS[c]}
             </ToggleButton>
           ))}
         </ToggleButtonGroup>
       </Box>
 
+      {/* Art (type) second — secondary qualifier */}
+      <Box>
+        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+          Art
+        </Typography>
+        <ToggleButtonGroup
+          value={recordType}
+          exclusive
+          onChange={(_, v) => { if (v) setRecordType(v) }}
+          size="small"
+          fullWidth
+        >
+          <ToggleButton value="aufgabe" sx={{ minHeight: 44 }}>Aufgabe</ToggleButton>
+          <ToggleButton value="beobachtung" sx={{ minHeight: 44 }}>Beobachtung</ToggleButton>
+        </ToggleButtonGroup>
+      </Box>
+
+      {/* Conditional fields — only shown when relevant */}
       {recordType === 'beobachtung' && (
         <FormControl size="small">
           <InputLabel id="severity-label">Schweregrad</InputLabel>
@@ -168,6 +161,17 @@ export default function TaskForm({ location, vineyardId, onSubmit, onCancel }: P
         </FormControl>
       )}
 
+      {/* Title last — user has context after picking category/type */}
+      <TextField
+        id="task-title"
+        label="Titel"
+        value={title}
+        onChange={(e) => setTitle(e.target.value)}
+        required
+        size="small"
+        autoFocus
+      />
+
       <TextField
         id="task-notes"
         label="Notizen"
@@ -188,11 +192,11 @@ export default function TaskForm({ location, vineyardId, onSubmit, onCancel }: P
       />
 
       <Box>
+        {/* No capture="environment" — lets users choose camera OR photo library */}
         <input
           ref={fileRef}
           type="file"
           accept="image/*"
-          capture="environment"
           multiple
           style={{ display: 'none' }}
           onChange={handleFilePick}
@@ -218,6 +222,7 @@ export default function TaskForm({ location, vineyardId, onSubmit, onCancel }: P
                 <IconButton
                   size="small"
                   onClick={() => removeFile(i)}
+                  aria-label="Foto entfernen"
                   sx={{
                     position: 'absolute', top: -8, right: -8,
                     bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider',

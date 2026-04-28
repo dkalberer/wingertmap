@@ -6,7 +6,7 @@ import {
   Drawer, SwipeableDrawer, useMediaQuery, useTheme,
   Badge, List, ListItemButton, ListItemIcon, ListItemText, ListSubheader,
   BottomNavigation, BottomNavigationAction, Button,
-  Snackbar, Alert,
+  Snackbar, Alert, Menu, MenuItem,
 } from '@mui/material'
 import LogoutIcon from '@mui/icons-material/Logout'
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts'
@@ -15,6 +15,7 @@ import ForestIcon from '@mui/icons-material/Forest'
 import GrapeIcon from '@mui/icons-material/Spa'
 import AgricultureIcon from '@mui/icons-material/Agriculture'
 import PeopleIcon from '@mui/icons-material/People'
+import MoreHorizIcon from '@mui/icons-material/MoreHoriz'
 import { useAuthStore } from './store/authStore'
 import { useMapStore } from './store/mapStore'
 import { useVineyardStore } from './store/vineyardStore'
@@ -32,7 +33,19 @@ import PersonalPage from './components/Personal/PersonalPage'
 import type { Vineyard, GeoJSONPolygon, GeoJSONLineString, GeoJSONPoint, Task } from './types'
 import { polygonCenter } from './utils/geo'
 
-const DRAWER_WIDTH = 300
+// Desktop layout dimensions
+const APPBAR_HEIGHT = 48
+const NAV_WIDTH = 180   // nav rail — list items only
+const PANEL_WIDTH = 320 // content panel — section content, independently scrollable
+
+// Tab index → label shown in the content panel header
+const TAB_LABELS: Record<number, string> = {
+  0: 'Weinberge',
+  1: 'Aufgaben',
+  2: 'Ernte',
+  3: 'Sorten',
+  4: 'Personal',
+}
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const token = useAuthStore((s) => s.token)
@@ -57,8 +70,14 @@ function MainLayout() {
   const [changePwOpen, setChangePwOpen] = useState(false)
   const [pendingBoundary, setPendingBoundary] = useState<GeoJSONPolygon | null>(null)
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false)
-  const [drawerTab, setDrawerTab] = useState(0) // 0 = Weinberge, 1 = Aufgaben
+  const [drawerTab, setDrawerTab] = useState(0)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
+
+  // Desktop: whether the content panel is expanded (clicking the active nav item toggles it)
+  const [panelOpen, setPanelOpen] = useState(true)
+
+  // Mobile: "Mehr" overflow menu for Sorten + Personal
+  const [moreMenuAnchor, setMoreMenuAnchor] = useState<null | HTMLElement>(null)
 
   const [pickingLocation, setPickingLocation] = useState(false)
   const [pendingLocation, setPendingLocation] = useState<GeoJSONPoint | null>(null)
@@ -95,6 +114,16 @@ function MainLayout() {
     if (isMobile) setMobileDrawerOpen(false)
   }
 
+  // Desktop nav click: toggle panel when re-clicking the active tab; switch + open for others
+  function handleDesktopNavClick(index: number) {
+    if (drawerTab === index) {
+      setPanelOpen(v => !v)
+    } else {
+      setDrawerTab(index)
+      setPanelOpen(true)
+    }
+  }
+
   function handleDrawComplete(geometry: GeoJSONPolygon | GeoJSONLineString) {
     if (geometry.type !== 'Polygon') return
     setPendingBoundary(geometry as GeoJSONPolygon)
@@ -127,6 +156,7 @@ function MainLayout() {
     if (task) {
       setDrawerTab(1)
       if (isMobile) setMobileDrawerOpen(true)
+      else setPanelOpen(true)
     }
   }
 
@@ -153,8 +183,9 @@ function MainLayout() {
     { index: 4, label: 'Personal', icon: <PeopleIcon fontSize="small" /> },
   ]
 
+  // Shared content nodes — rendered in either the desktop panel or the mobile drawer
   const tabContents: React.ReactNode[] = [
-    <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+    <Box key="weinberge" sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
       <VineyardList onSelect={selectVineyard} />
       {selected && (
         <>
@@ -163,7 +194,7 @@ function MainLayout() {
         </>
       )}
     </Box>,
-    <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+    <Box key="aufgaben" sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
       <GlobalTasksPanel
         tasks={tasks}
         loading={tasksLoading}
@@ -180,50 +211,19 @@ function MainLayout() {
         onTaskSelect={handleTaskSelect}
       />
     </Box>,
-    <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+    <Box key="ernte" sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
       <HarvestPage vineyard={selected} />
     </Box>,
-    <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+    <Box key="sorten" sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
       <VarietyManager />
     </Box>,
-    <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
+    <Box key="personal" sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
       <PersonalPage vineyard={selected} />
     </Box>,
   ]
 
-  // Desktop: vertical nav list + content
-  const desktopDrawerContent = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <List dense disablePadding>
-        <ListSubheader sx={{ lineHeight: '32px' }}>Nutzung</ListSubheader>
-        {nutzungItems.map(({ index, label, icon }) => (
-          <ListItemButton key={index} selected={drawerTab === index} onClick={() => setDrawerTab(index)}>
-            <ListItemIcon sx={{ minWidth: 36 }}>{icon}</ListItemIcon>
-            <ListItemText primary={label} />
-          </ListItemButton>
-        ))}
-        <Divider sx={{ my: 0.5 }} />
-        <ListSubheader sx={{ lineHeight: '32px' }}>Verwaltung</ListSubheader>
-        {verwaltungItems.map(({ index, label, icon }) => (
-          <ListItemButton key={index} selected={drawerTab === index} onClick={() => setDrawerTab(index)}>
-            <ListItemIcon sx={{ minWidth: 36 }}>{icon}</ListItemIcon>
-            <ListItemText primary={label} />
-          </ListItemButton>
-        ))}
-      </List>
-      <Divider />
-      {tabContents[drawerTab]}
-    </Box>
-  )
-
-  // Mobile bottom sheet: only content, nav is BottomNavigation
-  const mobileDrawerContent = (
-    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {tabContents[drawerTab]}
-    </Box>
-  )
-
-  const APPBAR_HEIGHT = 48
+  // Mobile bottom nav: "Mehr" maps to index 3 when tabs 3 or 4 are active
+  const bottomNavValue = drawerTab >= 3 ? 3 : drawerTab
 
   return (
     <Box sx={{ display: 'flex', height: '100vh' }}>
@@ -242,31 +242,146 @@ function MainLayout() {
             </Button>
           )}
           {token && isMobile && (
-            <IconButton color="inherit" size="small" onClick={() => setChangePwOpen(true)} title="Passwort ändern" sx={{ mr: 0.5 }}>
+            <IconButton
+              color="inherit"
+              size="small"
+              onClick={() => setChangePwOpen(true)}
+              aria-label="Passwort ändern"
+              title="Passwort ändern"
+              sx={{ mr: 0.5 }}
+            >
               <ManageAccountsIcon fontSize="small" />
             </IconButton>
           )}
-          <IconButton color="inherit" onClick={logout} title="Abmelden">
+          <IconButton
+            color="inherit"
+            onClick={logout}
+            aria-label="Abmelden"
+            title="Abmelden"
+          >
             <LogoutIcon />
           </IconButton>
         </Toolbar>
       </AppBar>
 
-      {/* Desktop: permanent sidebar with vertical nav */}
+      {/* ── DESKTOP LAYOUT ─────────────────────────────────────────────────── */}
+
       {!isMobile && (
-        <Drawer
-          variant="permanent"
-          sx={{
-            width: DRAWER_WIDTH,
-            flexShrink: 0,
-            '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box', top: `${APPBAR_HEIGHT}px`, height: `calc(100% - ${APPBAR_HEIGHT}px)`, overflow: 'hidden' },
-          }}
-        >
-          {desktopDrawerContent}
-        </Drawer>
+        <>
+          {/*
+           * Nav rail (180px) — navigation only, always visible.
+           * Uses MUI Drawer so the in-flow placeholder correctly pushes the map.
+           * Clicking the active item collapses the content panel; clicking another switches it.
+           */}
+          <Drawer
+            variant="permanent"
+            sx={{
+              width: NAV_WIDTH,
+              flexShrink: 0,
+              '& .MuiDrawer-paper': {
+                width: NAV_WIDTH,
+                boxSizing: 'border-box',
+                top: `${APPBAR_HEIGHT}px`,
+                height: `calc(100% - ${APPBAR_HEIGHT}px)`,
+                overflow: 'auto',
+                borderRight: 'none', // border is on the content panel instead
+              },
+            }}
+          >
+            <List dense disablePadding sx={{ px: 0.5, pt: 0.5 }}>
+              <ListSubheader sx={{ lineHeight: '32px', bgcolor: 'transparent' }}>Nutzung</ListSubheader>
+              {nutzungItems.map(({ index, label, icon }) => (
+                <ListItemButton
+                  key={index}
+                  selected={drawerTab === index}
+                  onClick={() => handleDesktopNavClick(index)}
+                  title={panelOpen && drawerTab === index ? `${label} zuklappen` : label}
+                >
+                  <ListItemIcon sx={{ minWidth: 36 }}>{icon}</ListItemIcon>
+                  <ListItemText primary={label} />
+                </ListItemButton>
+              ))}
+              <Divider sx={{ my: 0.5 }} />
+              <ListSubheader sx={{ lineHeight: '32px', bgcolor: 'transparent' }}>Verwaltung</ListSubheader>
+              {verwaltungItems.map(({ index, label, icon }) => (
+                <ListItemButton
+                  key={index}
+                  selected={drawerTab === index}
+                  onClick={() => handleDesktopNavClick(index)}
+                  title={panelOpen && drawerTab === index ? `${label} zuklappen` : label}
+                >
+                  <ListItemIcon sx={{ minWidth: 36 }}>{icon}</ListItemIcon>
+                  <ListItemText primary={label} />
+                </ListItemButton>
+              ))}
+            </List>
+          </Drawer>
+
+          {/*
+           * Content panel — two-layer approach (same pattern as MUI Drawer internally):
+           *   1. In-flow spacer Box: reserves horizontal space in the flex layout so the
+           *      map shifts right as the panel opens. Width-transitions push the map smoothly.
+           *   2. Fixed visual Box: the actual visible panel, positioned left of the map.
+           *      Uses position:fixed so it sits flush below the AppBar independent of scroll.
+           */}
+
+          {/* Layer 1: in-flow spacer */}
+          <Box
+            sx={{
+              width: panelOpen ? PANEL_WIDTH : 0,
+              flexShrink: 0,
+              transition: 'width 0.2s ease',
+            }}
+          />
+
+          {/* Layer 2: fixed visual panel */}
+          <Box
+            sx={{
+              position: 'fixed',
+              left: NAV_WIDTH,
+              top: APPBAR_HEIGHT,
+              width: panelOpen ? PANEL_WIDTH : 0,
+              height: `calc(100% - ${APPBAR_HEIGHT}px)`,
+              overflow: 'hidden',
+              transition: 'width 0.2s ease',
+              zIndex: theme.zIndex.drawer - 1,
+              bgcolor: 'background.paper',
+              display: 'flex',
+              flexDirection: 'column',
+              // Border appears once the panel has width; hidden at 0 naturally via overflow:hidden
+              borderRight: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            {/* Section header — overline label showing which section is active */}
+            <Box
+              sx={{
+                px: 2,
+                py: 0.75,
+                bgcolor: 'action.hover',
+                borderBottom: '1px solid',
+                borderColor: 'divider',
+                flexShrink: 0,
+              }}
+            >
+              <Typography
+                variant="overline"
+                color="text.secondary"
+                component="p"
+                sx={{ lineHeight: 1 }}
+              >
+                {TAB_LABELS[drawerTab]}
+              </Typography>
+            </Box>
+
+            {/* Section content — scrolls independently from the nav rail */}
+            {tabContents[drawerTab]}
+          </Box>
+        </>
       )}
 
-      {/* Mobile: swipeable bottom sheet (content only, nav via BottomNavigation) */}
+      {/* ── MOBILE LAYOUT ──────────────────────────────────────────────────── */}
+
       {isMobile && (
         <SwipeableDrawer
           anchor="bottom"
@@ -286,13 +401,16 @@ function MainLayout() {
             },
           }}
         >
-          {/* Drag handle */}
           <Box sx={{ display: 'flex', justifyContent: 'center', pt: 1, pb: 0.5 }}>
             <Box sx={{ width: 36, height: 4, borderRadius: 2, bgcolor: 'divider' }} />
           </Box>
-          {mobileDrawerContent}
+          <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            {tabContents[drawerTab]}
+          </Box>
         </SwipeableDrawer>
       )}
+
+      {/* ── MAP (always rendered) ───────────────────────────────────────────── */}
 
       <Box
         component="main"
@@ -320,35 +438,69 @@ function MainLayout() {
         />
       </Box>
 
-      {/* Mobile: Bottom Navigation Bar */}
+      {/* ── MOBILE BOTTOM NAVIGATION ────────────────────────────────────────── */}
+
       {isMobile && (
-        <BottomNavigation
-          value={drawerTab}
-          onChange={(_, newValue) => {
-            if (mobileDrawerOpen && newValue === drawerTab) {
-              setMobileDrawerOpen(false)
-            } else {
-              setDrawerTab(newValue)
-              setMobileDrawerOpen(true)
-            }
-          }}
-          sx={{
-            position: 'fixed',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            zIndex: 1100,
-            borderTop: 1,
-            borderColor: 'divider',
-            height: 'calc(56px + env(safe-area-inset-bottom))',
-            paddingBottom: 'env(safe-area-inset-bottom)',
-          }}
-        >
-          {[...nutzungItems, ...verwaltungItems].map(({ index, label, icon }) => (
-            <BottomNavigationAction key={index} label={label} icon={icon} />
-          ))}
-        </BottomNavigation>
+        <>
+          <BottomNavigation
+            value={bottomNavValue}
+            onChange={(_, newValue) => {
+              if (newValue === 3) return // "Mehr" handled by its own onClick
+              if (mobileDrawerOpen && newValue === drawerTab) {
+                setMobileDrawerOpen(false)
+              } else {
+                setDrawerTab(newValue)
+                setMobileDrawerOpen(true)
+              }
+            }}
+            sx={{
+              position: 'fixed',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              zIndex: 1100,
+              borderTop: 1,
+              borderColor: 'divider',
+              height: 'calc(56px + env(safe-area-inset-bottom))',
+              paddingBottom: 'env(safe-area-inset-bottom)',
+            }}
+          >
+            {nutzungItems.map(({ index, label, icon }) => (
+              <BottomNavigationAction key={index} label={label} icon={icon} />
+            ))}
+            <BottomNavigationAction
+              label="Mehr"
+              icon={
+                <Badge variant="dot" invisible={drawerTab < 3} color="primary">
+                  <MoreHorizIcon />
+                </Badge>
+              }
+              onClick={(e) => { e.stopPropagation(); setMoreMenuAnchor(e.currentTarget) }}
+            />
+          </BottomNavigation>
+
+          <Menu
+            anchorEl={moreMenuAnchor}
+            open={Boolean(moreMenuAnchor)}
+            onClose={() => setMoreMenuAnchor(null)}
+            anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+            transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+          >
+            {verwaltungItems.map(({ index, label, icon }) => (
+              <MenuItem
+                key={index}
+                selected={drawerTab === index}
+                onClick={() => { setDrawerTab(index); setMobileDrawerOpen(true); setMoreMenuAnchor(null) }}
+              >
+                <ListItemIcon>{icon}</ListItemIcon>
+                <ListItemText>{label}</ListItemText>
+              </MenuItem>
+            ))}
+          </Menu>
+        </>
       )}
+
+      {/* ── DIALOGS & GLOBAL OVERLAYS ───────────────────────────────────────── */}
 
       <Dialog open={changePwOpen} onClose={() => setChangePwOpen(false)} maxWidth="xs" fullWidth>
         <DialogTitle>Passwort ändern</DialogTitle>

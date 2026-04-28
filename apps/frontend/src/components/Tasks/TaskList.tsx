@@ -1,4 +1,6 @@
 import { Box, Typography, Collapse } from '@mui/material'
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore'
+import ExpandLessIcon from '@mui/icons-material/ExpandLess'
 import { useState } from 'react'
 import type { Task, TaskStatus } from '../../types'
 import TaskRow from './TaskRow'
@@ -7,6 +9,7 @@ interface Props {
   tasks: Task[]
   onStatusChange: (id: string, status: TaskStatus) => void
   onSelect: (task: Task) => void
+  onNew?: () => void
 }
 
 interface Group {
@@ -34,35 +37,78 @@ function CollapsibleGroup({ group }: { group: Group & { onStatusChange: Props['o
   const [open, setOpen] = useState(group.defaultOpen)
 
   return (
-    <Box>
+    <Box sx={{ mb: 0.5 }}>
+      {/* Semantic button — keyboard navigable, aria-expanded for screen readers */}
       <Box
+        component="button"
         onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-label={`${group.label}, ${group.tasks.length} Einträge`}
         sx={{
+          all: 'unset',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
+          width: '100%',
           cursor: 'pointer',
           py: 0.75,
           px: 0.5,
           borderRadius: 1,
+          boxSizing: 'border-box',
           '&:hover': { bgcolor: 'action.hover' },
+          '&:focus-visible': {
+            outline: '2px solid',
+            outlineColor: 'primary.main',
+            outlineOffset: 1,
+          },
         }}
       >
-        <Typography
-          variant="caption"
-          sx={{
-            fontWeight: 700,
-            textTransform: 'uppercase',
-            letterSpacing: 0.5,
-            color: group.urgent ? 'error.main' : 'text.secondary',
-          }}
-        >
-          {group.label} ({group.tasks.length})
-        </Typography>
-        <Typography variant="caption" color="text.disabled">{open ? '▲' : '▼'}</Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {/* Colored dot for urgent groups — not just color alone (text label also indicates urgency) */}
+          {group.urgent && (
+            <Box
+              aria-hidden="true"
+              sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'error.main', flexShrink: 0 }}
+            />
+          )}
+          <Typography
+            variant="caption"
+            component="span"
+            sx={{
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: group.urgent ? 'error.main' : 'text.secondary',
+            }}
+          >
+            {group.label}
+          </Typography>
+          {/* Pill badge for count — more scannable than parenthetical text */}
+          <Box
+            component="span"
+            aria-hidden="true"
+            sx={{
+              fontWeight: 600,
+              color: 'text.disabled',
+              bgcolor: 'action.hover',
+              px: 0.75,
+              py: 0.125,
+              borderRadius: 10,
+              fontSize: '0.65rem',
+              lineHeight: 1.6,
+            }}
+          >
+            {group.tasks.length}
+          </Box>
+        </Box>
+        {/* MUI icons instead of ASCII ▲▼ */}
+        {open
+          ? <ExpandLessIcon sx={{ fontSize: 16, color: 'text.disabled' }} aria-hidden="true" />
+          : <ExpandMoreIcon sx={{ fontSize: 16, color: 'text.disabled' }} aria-hidden="true" />}
       </Box>
+
       <Collapse in={open}>
-        <Box sx={{ pb: 0.5 }}>
+        <Box sx={{ pb: 1 }}>
           {group.tasks.map((t) => (
             <TaskRow
               key={t.id}
@@ -77,15 +123,39 @@ function CollapsibleGroup({ group }: { group: Group & { onStatusChange: Props['o
   )
 }
 
-export default function TaskList({ tasks, onStatusChange, onSelect }: Props) {
+export default function TaskList({ tasks, onStatusChange, onSelect, onNew }: Props) {
   if (tasks.length === 0) {
     return (
       <Box sx={{ py: 4, textAlign: 'center', px: 2 }}>
-        <Typography sx={{ fontSize: 36, mb: 1 }}>✓</Typography>
+        <Typography sx={{ fontSize: 36, mb: 1 }} aria-hidden="true">✓</Typography>
         <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>Keine offenen Aufgaben</Typography>
-        <Typography variant="caption" color="text.secondary">
+        <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 2 }}>
           Neue Aufgabe erstellen oder Standort auf der Karte wählen.
         </Typography>
+        {onNew && (
+          <Box
+            component="button"
+            onClick={onNew}
+            sx={{
+              all: 'unset',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 0.5,
+              px: 2,
+              py: 1,
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+              borderRadius: 2,
+              fontSize: '0.8125rem',
+              fontWeight: 600,
+              cursor: 'pointer',
+              '&:hover': { bgcolor: 'primary.dark' },
+              '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
+            }}
+          >
+            + Neue Aufgabe
+          </Box>
+        )}
       </Box>
     )
   }
@@ -94,7 +164,7 @@ export default function TaskList({ tasks, onStatusChange, onSelect }: Props) {
   for (const t of tasks) buckets[getDateGroup(t)].push(t)
 
   const groups: Group[] = [
-    { key: 'overdue', label: '⚠ Überfällig',  tasks: buckets.overdue, defaultOpen: true, urgent: true },
+    { key: 'overdue', label: '⚠ Überfällig',  tasks: buckets.overdue, defaultOpen: true,  urgent: true },
     { key: 'today',   label: '⏰ Heute',        tasks: buckets.today,   defaultOpen: true },
     { key: 'week',    label: '📅 Diese Woche',  tasks: buckets.week,    defaultOpen: true },
     { key: 'later',   label: '📋 Später',       tasks: buckets.later,   defaultOpen: true },

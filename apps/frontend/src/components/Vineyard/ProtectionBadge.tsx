@@ -7,16 +7,17 @@ interface Props {
   vineyardId: string
 }
 
-const LEVEL_COLOR: Record<string, string> = {
-  grün: '#4caf50',
-  gelb: '#ff9800',
-  rot: '#f44336',
-}
+// Map protection level to MUI color prop — uses theme palette instead of hardcoded hex
+const LEVEL_CHIP_COLOR = {
+  grün: 'success',
+  gelb: 'warning',
+  rot:  'error',
+} as const
 
 const LEVEL_ICON: Record<string, string> = {
   grün: '🟢',
   gelb: '🟡',
-  rot: '🔴',
+  rot:  '🔴',
 }
 
 export default function ProtectionBadge({ vineyardId }: Props) {
@@ -34,12 +35,16 @@ export default function ProtectionBadge({ vineyardId }: Props) {
 
   if (!status) {
     return (
-      <Chip label="Pflanzenschutz: kein Eintrag" size="small" sx={{ bgcolor: 'grey.300', color: 'text.secondary' }} />
+      <Chip
+        label="Pflanzenschutz: kein Eintrag"
+        size="small"
+        sx={{ bgcolor: 'action.hover', color: 'text.secondary' }}
+      />
     )
   }
 
   const icon = LEVEL_ICON[status.level] ?? '⚪'
-  const color = LEVEL_COLOR[status.level] ?? '#9e9e9e'
+  const chipColor = LEVEL_CHIP_COLOR[status.level as keyof typeof LEVEL_CHIP_COLOR] ?? 'default'
   const days = status.daysSinceSpray
 
   const label = days !== null
@@ -65,7 +70,9 @@ export default function ProtectionBadge({ vineyardId }: Props) {
       <Chip
         label={label}
         size="small"
-        sx={{ bgcolor: color, color: '#fff', fontWeight: 500, cursor: 'default' }}
+        color={chipColor}
+        variant="filled"
+        sx={{ fontWeight: 500, cursor: 'default' }}
       />
     </Tooltip>
   )

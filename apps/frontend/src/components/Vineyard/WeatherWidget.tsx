@@ -38,18 +38,18 @@ export default function WeatherWidget({ vineyardId }: Props) {
   }
 
   const items = [
-    { icon: '🌡', label: `${data.tempC.toFixed(1)} °C` },
-    { icon: '💧', label: `${data.humidityPct.toFixed(0)} %` },
-    { icon: '🌧', label: `${data.precipMm.toFixed(1)} mm` },
-    { icon: '🌿', label: `${data.leafWetH.toFixed(1)} h` },
+    { icon: '🌡', srLabel: 'Temperatur', label: `${data.tempC.toFixed(1)} °C` },
+    { icon: '💧', srLabel: 'Luftfeuchtigkeit', label: `${data.humidityPct.toFixed(0)} %` },
+    { icon: '🌧', srLabel: 'Niederschlag', label: `${data.precipMm.toFixed(1)} mm` },
+    { icon: '🌿', srLabel: 'Blattnässestunden', label: `${data.leafWetH.toFixed(1)} h` },
   ]
 
   return (
     <Box>
       <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1 }}>
-        {items.map(({ icon, label }) => (
+        {items.map(({ icon, srLabel, label }) => (
           <Box
-            key={icon}
+            key={srLabel}
             sx={{
               display: 'flex',
               alignItems: 'center',
@@ -60,8 +60,26 @@ export default function WeatherWidget({ vineyardId }: Props) {
               py: 0.75,
             }}
           >
-            <span style={{ fontSize: '1rem' }}>{icon}</span>
-            <Typography variant="body2" sx={{ fontWeight: 500 }}>{label}</Typography>
+            {/* aria-hidden: emoji is decorative; sr-only span provides the text label */}
+            <span aria-hidden="true" style={{ fontSize: '1rem' }}>{icon}</span>
+            <Typography variant="body2" sx={{ fontWeight: 500 }}>
+              <span
+                style={{
+                  position: 'absolute',
+                  width: 1,
+                  height: 1,
+                  padding: 0,
+                  margin: -1,
+                  overflow: 'hidden',
+                  clip: 'rect(0,0,0,0)',
+                  whiteSpace: 'nowrap',
+                  border: 0,
+                }}
+              >
+                {srLabel}:{' '}
+              </span>
+              {label}
+            </Typography>
           </Box>
         ))}
       </Box>

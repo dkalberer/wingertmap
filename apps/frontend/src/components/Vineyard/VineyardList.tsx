@@ -1,15 +1,16 @@
-import { useState } from 'react'
-import { useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import {
   List, ListItem, ListItemButton, ListItemText,
-  CircularProgress, Alert, Typography, IconButton, Box,
+  CircularProgress, Alert, Typography, IconButton, Box, Badge,
   Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions, Button,
 } from '@mui/material'
 import DeleteIcon from '@mui/icons-material/Delete'
 import StarIcon from '@mui/icons-material/Star'
 import StarBorderIcon from '@mui/icons-material/StarBorder'
+import MapIcon from '@mui/icons-material/Map'
 import type { Vineyard } from '../../types'
 import { useVineyardStore } from '../../store/vineyardStore'
+import { useTaskStore } from '../../store/taskStore'
 
 const FAVORITE_KEY = 'favoriteVineyardId'
 
@@ -19,10 +20,8 @@ interface Props {
 
 export default function VineyardList({ onSelect }: Props) {
   const { vineyards, loading, error, remove, load } = useVineyardStore()
+  const { tasks } = useTaskStore()
   useEffect(() => { load() }, [load])
-  function handleSelect(v: Vineyard) {
-    onSelect(v)
-  }
 
   const [favoriteId, setFavoriteId] = useState<string | null>(() => localStorage.getItem(FAVORITE_KEY))
 
@@ -53,44 +52,75 @@ export default function VineyardList({ onSelect }: Props) {
 
   if (loading) return <CircularProgress size={24} sx={{ m: 2 }} />
   if (error) return <Alert severity="error" sx={{ m: 1 }}>{error}</Alert>
-  if (vineyards.length === 0) return (
-    <Typography variant="body2" sx={{ p: 2, color: 'text.secondary' }}>Keine Wingerte vorhanden.</Typography>
-  )
+
+  if (vineyards.length === 0) {
+    return (
+      <Box sx={{ p: 3, textAlign: 'center' }}>
+        <MapIcon sx={{ fontSize: 40, color: 'text.disabled', mb: 1 }} aria-hidden="true" />
+        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>
+          Noch kein Wingert angelegt
+        </Typography>
+        <Typography variant="caption" color="text.secondary" component="p">
+          Zeichne eine Fläche auf der Karte, um deinen ersten Wingert zu erstellen.
+        </Typography>
+      </Box>
+    )
+  }
 
   return (
     <>
       <List dense disablePadding>
-        {vineyards.map((v) => (
-          <ListItem
-            key={v.id}
-            disablePadding
-            secondaryAction={
-              <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                <IconButton
-                  size="small"
-                  onClick={(e) => toggleFavorite(v, e)}
-                  title={favoriteId === v.id ? 'Favorit entfernen' : 'Als Favorit setzen'}
+        {vineyards.map((v) => {
+          // Count open tasks for this vineyard for the badge
+          const openCount = tasks.filter(
+            (t) => t.vineyardId === v.id && t.status !== 'erledigt'
+          ).length
+
+          return (
+            <ListItem
+              key={v.id}
+              disablePadding
+              secondaryAction={
+                <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                  <IconButton
+                    size="small"
+                    onClick={(e) => toggleFavorite(v, e)}
+                    aria-label={favoriteId === v.id ? 'Favorit entfernen' : 'Als Favorit setzen'}
+                    title={favoriteId === v.id ? 'Favorit entfernen' : 'Als Favorit setzen'}
+                  >
+                    {favoriteId === v.id
+                      ? <StarIcon fontSize="small" color="warning" />
+                      : <StarBorderIcon fontSize="small" />}
+                  </IconButton>
+                  <IconButton
+                    edge="end"
+                    size="small"
+                    onClick={(e) => { e.stopPropagation(); setToDelete(v) }}
+                    aria-label={`${v.name} löschen`}
+                    title="Wingert löschen"
+                  >
+                    <DeleteIcon fontSize="small" />
+                  </IconButton>
+                </Box>
+              }
+            >
+              <ListItemButton onClick={() => onSelect(v)} sx={{ pr: 9 }}>
+                <Badge
+                  badgeContent={openCount}
+                  color="error"
+                  max={99}
+                  sx={{ '& .MuiBadge-badge': { right: -6, top: 6 } }}
                 >
-                  {favoriteId === v.id
-                    ? <StarIcon fontSize="small" color="warning" />
-                    : <StarBorderIcon fontSize="small" />}
-                </IconButton>
-                <IconButton
-                  edge="end"
-                  size="small"
-                  onClick={(e) => { e.stopPropagation(); setToDelete(v) }}
-                  title="Wingert löschen"
-                >
-                  <DeleteIcon fontSize="small" />
-                </IconButton>
-              </Box>
-            }
-          >
-            <ListItemButton onClick={() => handleSelect(v)} sx={{ pr: 9 }}>
-              <ListItemText primary={v.name} secondary={v.description} />
-            </ListItemButton>
-          </ListItem>
-        ))}
+                  <ListItemText
+                    primary={v.name}
+                    secondary={v.description}
+                    slotProps={{ primary: { sx: { fontWeight: 500 } } }}
+                  />
+                </Badge>
+              </ListItemButton>
+            </ListItem>
+          )
+        })}
       </List>
 
       <Dialog open={!!toDelete} onClose={() => setToDelete(null)}>
