@@ -76,10 +76,10 @@ func (s *TimeEntryStore) Delete(id, userID uuid.UUID) error {
 }
 
 func (s *TimeEntryStore) StatsByYear(userID uuid.UUID, year int) ([]domain.EmployeeMonthStats, error) {
-	// First get all employees for this user
+	// First get active (non-deleted) employees for this user.
 	var empRows []employeeScanRow
 	err := s.db.Raw(
-		`SELECT id, name, created_by, created_at FROM employees WHERE created_by = ? ORDER BY name`,
+		`SELECT id, name, created_by, created_at FROM employees WHERE created_by = ? AND deleted_at IS NULL ORDER BY name`,
 		userID,
 	).Scan(&empRows).Error
 	if err != nil {
@@ -103,7 +103,8 @@ func (s *TimeEntryStore) StatsByYear(userID uuid.UUID, year int) ([]domain.Emplo
 		return nil, err
 	}
 
-	// Build stats map
+	// Build stats map: active employees are pre-seeded with zeros so they always
+	// appear even without entries. Deleted employees surface via monthRows only.
 	statsMap := make(map[uuid.UUID]*domain.EmployeeMonthStats)
 	for _, e := range empRows {
 		statsMap[e.ID] = &domain.EmployeeMonthStats{
@@ -112,15 +113,35 @@ func (s *TimeEntryStore) StatsByYear(userID uuid.UUID, year int) ([]domain.Emplo
 		}
 	}
 	for _, r := range monthRows {
-		if s, ok := statsMap[r.EmployeeID]; ok && r.Month >= 1 && r.Month <= 12 {
-			s.Months[r.Month-1] = r.Hours
-			s.Total += r.Hours
+		if _, ok := statsMap[r.EmployeeID]; !ok {
+			// Deleted employee that still has time entries — include them.
+			statsMap[r.EmployeeID] = &domain.EmployeeMonthStats{
+				EmployeeID:   r.EmployeeID,
+				EmployeeName: r.EmployeeName,
+			}
+		}
+		if r.Month >= 1 && r.Month <= 12 {
+			statsMap[r.EmployeeID].Months[r.Month-1] = r.Hours
+			statsMap[r.EmployeeID].Total += r.Hours
 		}
 	}
 
-	result := make([]domain.EmployeeMonthStats, 0, len(empRows))
+	// Maintain stable order: active employees alphabetically first, then deleted.
+	result := make([]domain.EmployeeMonthStats, 0, len(statsMap))
 	for _, e := range empRows {
 		result = append(result, *statsMap[e.ID])
+	}
+	for empID, s := range statsMap {
+		found := false
+		for _, e := range empRows {
+			if e.ID == empID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			result = append(result, *s)
+		}
 	}
 	return result, nil
 }

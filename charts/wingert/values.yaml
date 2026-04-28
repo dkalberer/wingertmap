@@ -47,6 +47,9 @@ minio:
   rootUser: "wingert"
   rootPassword: "change-me"
 
+backup:
+  storage: 5Gi
+
 ingress:
   enabled: true
   host: wingert.local

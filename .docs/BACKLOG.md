@@ -85,11 +85,6 @@ DELETE /api/pruning/{id}
 
 ---
 
-Backlog:
-
-- Höhenbild in 3D machen?
----
-
 ## Implementierungsreihenfolge
 
 ```

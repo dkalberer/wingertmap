@@ -20,6 +20,27 @@ type EmployeeStore struct{ db *gorm.DB }
 func NewEmployeeStore(db *gorm.DB) *EmployeeStore { return &EmployeeStore{db: db} }
 
 func (s *EmployeeStore) Create(name string, createdBy uuid.UUID) (*domain.Employee, error) {
+	// Reactivate a soft-deleted employee with the same name rather than inserting a
+	// duplicate, so historical time entries stay linked to the same record.
+	res := s.db.Exec(
+		`UPDATE employees SET deleted_at = NULL WHERE name = ? AND created_by = ? AND deleted_at IS NOT NULL`,
+		name, createdBy,
+	)
+	if res.Error != nil {
+		return nil, res.Error
+	}
+	if res.RowsAffected > 0 {
+		var r employeeScanRow
+		err := s.db.Raw(
+			`SELECT id, name, created_by, created_at FROM employees WHERE name = ? AND created_by = ?`,
+			name, createdBy,
+		).Scan(&r).Error
+		if err != nil {
+			return nil, err
+		}
+		e := domain.Employee{ID: r.ID, Name: r.Name, CreatedBy: r.CreatedBy, CreatedAt: r.CreatedAt}
+		return &e, nil
+	}
 	id := uuid.New()
 	err := s.db.Exec(
 		`INSERT INTO employees (id, name, created_by) VALUES (?, ?, ?)`,
@@ -34,7 +55,7 @@ func (s *EmployeeStore) Create(name string, createdBy uuid.UUID) (*domain.Employ
 func (s *EmployeeStore) ListByUser(userID uuid.UUID) ([]domain.Employee, error) {
 	var rows []employeeScanRow
 	err := s.db.Raw(
-		`SELECT id, name, created_by, created_at FROM employees WHERE created_by = ? ORDER BY name`,
+		`SELECT id, name, created_by, created_at FROM employees WHERE created_by = ? AND deleted_at IS NULL ORDER BY name`,
 		userID,
 	).Scan(&rows).Error
 	if err != nil {
@@ -48,7 +69,10 @@ func (s *EmployeeStore) ListByUser(userID uuid.UUID) ([]domain.Employee, error) 
 }
 
 func (s *EmployeeStore) Delete(id, userID uuid.UUID) error {
-	return s.db.Exec(`DELETE FROM employees WHERE id = ? AND created_by = ?`, id, userID).Error
+	return s.db.Exec(
+		`UPDATE employees SET deleted_at = NOW() WHERE id = ? AND created_by = ? AND deleted_at IS NULL`,
+		id, userID,
+	).Error
 }
 
 func (s *EmployeeStore) loadOne(id uuid.UUID) (*domain.Employee, error) {

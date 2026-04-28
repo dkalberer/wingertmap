@@ -259,7 +259,7 @@ function MainLayout() {
           sx={{
             width: DRAWER_WIDTH,
             flexShrink: 0,
-            '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box', top: `${APPBAR_HEIGHT}px` },
+            '& .MuiDrawer-paper': { width: DRAWER_WIDTH, boxSizing: 'border-box', top: `${APPBAR_HEIGHT}px`, height: `calc(100% - ${APPBAR_HEIGHT}px)`, overflow: 'hidden' },
           }}
         >
           {desktopDrawerContent}

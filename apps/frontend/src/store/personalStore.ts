@@ -10,6 +10,7 @@ interface PersonalState {
   workTypes: WorkType[]
   entries: TimeEntry[]
   stats: EmployeeMonthStats[]
+  prevYearStats: EmployeeMonthStats[]
   year: number
   loading: boolean
   error: string | null
@@ -32,6 +33,7 @@ export const usePersonalStore = create<PersonalState>((set, get) => ({
   workTypes: [],
   entries: [],
   stats: [],
+  prevYearStats: [],
   year: new Date().getFullYear(),
   loading: false,
   error: null,
@@ -40,13 +42,14 @@ export const usePersonalStore = create<PersonalState>((set, get) => ({
     set({ loading: true, error: null })
     try {
       const year = get().year
-      const [employees, workTypes, entries, stats] = await Promise.all([
+      const [employees, workTypes, entries, stats, prevYearStats] = await Promise.all([
         listEmployees(),
         listWorkTypes(),
         listTimeEntries(year),
         getTimeEntryStats(year),
+        getTimeEntryStats(year - 1),
       ])
-      set({ employees, workTypes, entries, stats })
+      set({ employees, workTypes, entries, stats, prevYearStats })
     } catch (e: unknown) {
       set({ error: e instanceof Error ? e.message : 'Fehler beim Laden' })
     } finally {
