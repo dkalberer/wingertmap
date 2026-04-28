@@ -4,11 +4,7 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('./components/Map/VineyardMap', () => ({
   default: () => <div data-testid="vineyard-map" />,
 }))
-vi.mock('react-leaflet', () => ({
-  MapContainer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  TileLayer: () => null,
-}))
-vi.mock('leaflet/dist/leaflet.css', () => ({}))
+vi.mock('maplibre-gl/dist/maplibre-gl.css', () => ({}))
 
 import App from './App'
 

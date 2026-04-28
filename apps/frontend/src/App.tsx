@@ -87,8 +87,10 @@ function MainLayout() {
   function selectVineyard(v: Vineyard) {
     setSelected(v)
     if (v.boundary) {
-      setCenter(polygonCenter(v.boundary))
+      const center = polygonCenter(v.boundary)
+      setCenter(center)
       setZoom(17)
+      flyToRef.current?.(center[0], center[1], 17)
     }
     if (isMobile) setMobileDrawerOpen(false)
   }
@@ -152,7 +154,7 @@ function MainLayout() {
   ]
 
   const tabContents: React.ReactNode[] = [
-    <Box sx={{ overflow: 'auto', flex: 1 }}>
+    <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
       <VineyardList onSelect={selectVineyard} />
       {selected && (
         <>
@@ -161,7 +163,7 @@ function MainLayout() {
         </>
       )}
     </Box>,
-    <Box sx={{ overflow: 'auto', flex: 1 }}>
+    <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
       <GlobalTasksPanel
         tasks={tasks}
         loading={tasksLoading}
@@ -178,13 +180,13 @@ function MainLayout() {
         onTaskSelect={handleTaskSelect}
       />
     </Box>,
-    <Box sx={{ overflow: 'auto', flex: 1 }}>
+    <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
       <HarvestPage vineyard={selected} />
     </Box>,
-    <Box sx={{ overflow: 'auto', flex: 1 }}>
+    <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
       <VarietyManager />
     </Box>,
-    <Box sx={{ overflow: 'auto', flex: 1 }}>
+    <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
       <PersonalPage vineyard={selected} />
     </Box>,
   ]

@@ -9,7 +9,7 @@ export default defineConfig({
         manualChunks: {
           'react-vendor': ['react', 'react-dom'],
           'mui': ['@mui/material', '@mui/icons-material'],
-          'leaflet': ['leaflet', 'react-leaflet', 'leaflet-draw'],
+          'maplibre': ['maplibre-gl', 'react-map-gl/maplibre', 'maplibre-gl-draw'],
         },
       },
     },

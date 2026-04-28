@@ -1,67 +1,53 @@
 import { useEffect, useRef } from 'react'
-import { useMap } from 'react-leaflet'
-import L from 'leaflet'
-import 'leaflet-draw'
-import 'leaflet-draw/dist/leaflet.draw.css'
+import { useMap } from 'react-map-gl/maplibre'
+import MapboxDraw from 'maplibre-gl-draw'
 import { useMapStore } from '../../store/mapStore'
 import type { GeoJSONPolygon, GeoJSONLineString } from '../../types'
 
 interface Props {
   onDrawComplete: (geometry: GeoJSONPolygon | GeoJSONLineString) => void
+  drawRef: React.RefObject<MapboxDraw | null>
 }
 
-export default function DrawingTools({ onDrawComplete }: Props) {
-  const map = useMap()
+export default function DrawingTools({ onDrawComplete, drawRef }: Props) {
+  const { current: map } = useMap()
   const { drawingMode, setDrawingMode } = useMapStore()
   const callbackRef = useRef(onDrawComplete)
   useEffect(() => { callbackRef.current = onDrawComplete }, [onDrawComplete])
 
+  // Sync drawing mode to draw control
   useEffect(() => {
-    console.log('[DrawingTools] drawingMode changed:', drawingMode)
-    if (drawingMode === 'none') return
-
-    console.log('[DrawingTools] enabling handler for', drawingMode)
-    const drawnItems = new L.FeatureGroup()
-    map.addLayer(drawnItems)
-
-    let handler: L.Draw.Polygon | L.Draw.Polyline
-
+    const draw = drawRef.current
+    if (!draw) return
     if (drawingMode === 'polygon') {
-      handler = new L.Draw.Polygon(map as L.DrawMap, {
-        shapeOptions: { color: '#15803d', weight: 3 },
-      })
+      draw.changeMode('draw_polygon')
+    } else if (drawingMode === 'linestring') {
+      draw.changeMode('draw_line_string')
     } else {
-      handler = new L.Draw.Polyline(map as L.DrawMap, {
-        shapeOptions: { color: '#15803d', weight: 3 },
-      })
+      try { draw.changeMode('simple_select') } catch {}
     }
-    handler.enable()
-    console.log('[DrawingTools] handler enabled, waiting for draw:created')
+  }, [drawingMode, drawRef])
 
-    function onCreated(e: L.LeafletEvent) {
-      console.log('[DrawingTools] draw:created fired', e)
-      const event = e as unknown as L.DrawEvents.Created
-      const layer = event.layer as L.Polygon | L.Polyline
-      const geojson = layer.toGeoJSON()
-      console.log('[DrawingTools] geometry:', geojson.geometry)
+  // Listen for draw.create events
+  useEffect(() => {
+    if (!map) return
+    const rawMap = map.getMap()
 
-      if (geojson.geometry.type === 'Polygon') {
-        callbackRef.current(geojson.geometry as GeoJSONPolygon)
-      } else if (geojson.geometry.type === 'LineString') {
-        callbackRef.current(geojson.geometry as GeoJSONLineString)
-      }
+    function onCreated(e: any) {
+      const feature = e.features?.[0]
+      if (!feature) return
+      drawRef.current?.deleteAll()
       setDrawingMode('none')
+      if (feature.geometry.type === 'Polygon') {
+        callbackRef.current(feature.geometry as GeoJSONPolygon)
+      } else if (feature.geometry.type === 'LineString') {
+        callbackRef.current(feature.geometry as GeoJSONLineString)
+      }
     }
 
-    map.on(L.Draw.Event.CREATED, onCreated)
-
-    return () => {
-      console.log('[DrawingTools] cleanup, disabling handler')
-      handler.disable()
-      map.off(L.Draw.Event.CREATED, onCreated)
-      map.removeLayer(drawnItems)
-    }
-  }, [drawingMode, map, setDrawingMode])
+    rawMap.on('draw.create', onCreated)
+    return () => { rawMap.off('draw.create', onCreated) }
+  }, [map, drawRef, setDrawingMode])
 
   return null
 }

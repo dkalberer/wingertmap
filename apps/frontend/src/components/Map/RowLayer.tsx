@@ -1,9 +1,6 @@
-import { useState } from 'react'
-import { Polyline, Tooltip, useMap } from 'react-leaflet'
-import L from 'leaflet'
-import 'leaflet-draw'
-import 'leaflet-draw/dist/leaflet.draw.css'
-import { useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { Source, Layer, useMap } from 'react-map-gl/maplibre'
+import MapboxDraw from 'maplibre-gl-draw'
 import type { Row, Vine, GeoJSONLineString } from '../../types'
 import { updateRowStatus, updateRowLine, deleteRow, confirmAllRows } from '../../api/rows'
 import { listVines } from '../../api/vines'
@@ -14,22 +11,40 @@ interface Props {
   vineyardId: string
   onChanged: () => void
   onVineSelect?: (vine: Vine) => void
+  drawRef: React.RefObject<MapboxDraw | null>
 }
 
-const PROPOSED_COLOR = '#f59e0b'  // amber
-const CONFIRMED_COLOR = '#16a34a' // green
+const PROPOSED_COLOR = '#f59e0b'
+const CONFIRMED_COLOR = '#16a34a'
 
-export default function RowLayer({ rows, vineyardId, onChanged, onVineSelect }: Props) {
+export default function RowLayer({ rows, vineyardId, onChanged, onVineSelect, drawRef }: Props) {
+  const { current: map } = useMap()
   const [selected, setSelected] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const editFeatureIdRef = useRef<string | null>(null)
   const [vines, setVines] = useState<Vine[]>([])
-  const map = useMap()
 
   useEffect(() => {
     if (rows.length === 0) { setVines([]); return }
-    Promise.all(rows.map((r) => listVines(r.id))).then((results) => {
-      setVines(results.flat())
-    })
+    Promise.all(rows.map(r => listVines(r.id))).then(results => setVines(results.flat()))
   }, [rows])
+
+  const geojson = {
+    type: 'FeatureCollection' as const,
+    features: rows
+      .filter(r => r.line && r.id !== editingId)
+      .map(r => ({
+        type: 'Feature' as const,
+        id: r.id,
+        properties: {
+          id: r.id,
+          rowNumber: r.rowNumber,
+          status: r.status,
+          selected: r.id === selected,
+        },
+        geometry: r.line!,
+      })),
+  }
 
   async function handleConfirm(id: string) {
     await updateRowStatus(id, 'confirmed')
@@ -49,69 +64,88 @@ export default function RowLayer({ rows, vineyardId, onChanged, onVineSelect }: 
   }
 
   function handleEdit(row: Row) {
-    if (!row.line) return
+    if (!row.line || !drawRef.current) return
     setSelected(null)
-    const coords: [number, number][] = row.line.coordinates.map(([lng, lat]) => [lat, lng])
-    const poly = L.polyline(coords, { color: '#1d4ed8', weight: 3, dashArray: '6 4' }).addTo(map)
-
-    const editHandler = new (L.EditToolbar.Edit as any)(map, {
-      featureGroup: L.featureGroup([poly]),
-    })
-    editHandler.enable()
-
-    map.once('click', async () => {
-      editHandler.save()
-      editHandler.disable()
-      const edited = poly.getLatLngs() as L.LatLng[]
-      map.removeLayer(poly)
-      if (edited.length >= 2) {
-        const line: GeoJSONLineString = {
-          type: 'LineString',
-          coordinates: edited.map((ll) => [ll.lng, ll.lat]),
-        }
-        await updateRowLine(row.id, line)
-        onChanged()
-      }
-    })
+    const feature = { type: 'Feature' as const, properties: {}, geometry: row.line }
+    const ids = drawRef.current.add(feature)
+    const featureId = String(ids[0])
+    editFeatureIdRef.current = featureId
+    drawRef.current.changeMode('direct_select', { featureId })
+    setEditingId(row.id)
   }
 
-  const proposedCount = rows.filter((r) => r.status === 'proposed').length
-  const selectedRow = rows.find((r) => r.id === selected)
+  async function handleSave(row: Row) {
+    const draw = drawRef.current
+    if (!draw || !editFeatureIdRef.current) return
+    const all = draw.getAll()
+    const feat = all.features.find(f => f.id === editFeatureIdRef.current)
+    draw.deleteAll()
+    editFeatureIdRef.current = null
+    setEditingId(null)
+    if (feat?.geometry?.type === 'LineString' && feat.geometry.coordinates.length >= 2) {
+      const line: GeoJSONLineString = { type: 'LineString', coordinates: feat.geometry.coordinates as [number, number][] }
+      await updateRowLine(row.id, line)
+      onChanged()
+    }
+  }
+
+  function handleCancel() {
+    drawRef.current?.deleteAll()
+    editFeatureIdRef.current = null
+    setEditingId(null)
+  }
+
+  // Handle clicks on row features
+  useEffect(() => {
+    if (!map) return
+    const rawMap = map.getMap()
+
+    function onClick(e: any) {
+      const features = rawMap.queryRenderedFeatures(e.point, { layers: ['rows-line', 'rows-casing'] })
+      if (features.length > 0) {
+        const id = features[0].properties?.id
+        if (id) { setSelected(prev => prev === id ? null : id); return }
+      }
+      setSelected(null)
+    }
+
+    rawMap.on('click', onClick)
+    return () => { rawMap.off('click', onClick) }
+  }, [map])
+
+  const proposedCount = rows.filter(r => r.status === 'proposed').length
+  const selectedRow = rows.find(r => r.id === selected)
+  const editingRow = rows.find(r => r.id === editingId)
 
   return (
     <>
-      {rows.map((row) => {
-        if (!row.line) return null
-        const positions: [number, number][] = row.line.coordinates.map(([lng, lat]) => [lat, lng])
-        const isSelected = selected === row.id
-        const color = row.status === 'proposed' ? PROPOSED_COLOR : CONFIRMED_COLOR
+      <Source id="rows" type="geojson" data={geojson}>
+        <Layer
+          id="rows-casing"
+          type="line"
+          paint={{
+            'line-color': '#fff',
+            'line-width': ['case', ['==', ['get', 'selected'], true], 7, 5],
+            'line-opacity': 0.6,
+          }}
+        />
+        <Layer
+          id="rows-line"
+          type="line"
+          paint={{
+            'line-color': ['case',
+              ['==', ['get', 'selected'], true], '#1d4ed8',
+              ['==', ['get', 'status'], 'proposed'], PROPOSED_COLOR,
+              CONFIRMED_COLOR,
+            ],
+            'line-width': ['case', ['==', ['get', 'selected'], true], 5, 3],
+            'line-dasharray': ['case', ['==', ['get', 'status'], 'proposed'], ['literal', [8, 4]], ['literal', [1, 0]]],
+            'line-opacity': 0.9,
+          }}
+        />
+      </Source>
 
-        return (
-          <Polyline
-            key={row.id}
-            positions={positions}
-            pathOptions={{
-              color: isSelected ? '#1d4ed8' : color,
-              weight: isSelected ? 5 : 3,
-              dashArray: row.status === 'proposed' ? '8 4' : undefined,
-              opacity: 0.9,
-            }}
-            eventHandlers={{ click: () => setSelected(isSelected ? null : row.id) }}
-          >
-            <Tooltip>
-              <span style={{ fontSize: 12 }}>
-                <strong>Reihe {row.rowNumber}</strong>
-                <span style={{ marginLeft: 6, color: row.status === 'proposed' ? '#d97706' : '#15803d' }}>
-                  {row.status === 'proposed' ? '● Vorschlag' : '● Bestätigt'}
-                </span>
-              </span>
-            </Tooltip>
-          </Polyline>
-        )
-      })}
-
-      {/* Floating action panel for selected row */}
-      {selectedRow && (
+      {selectedRow && !editingId && (
         <RowActionPanel
           row={selectedRow}
           onConfirm={() => handleConfirm(selectedRow.id)}
@@ -121,8 +155,21 @@ export default function RowLayer({ rows, vineyardId, onChanged, onVineSelect }: 
         />
       )}
 
-      {proposedCount > 0 && (
-        <ConfirmAllControl count={proposedCount} onConfirmAll={handleConfirmAll} />
+      {editingRow && (
+        <RowActionPanel
+          row={editingRow}
+          editing
+          onConfirm={() => {}}
+          onEdit={() => {}}
+          onSave={() => handleSave(editingRow)}
+          onCancel={handleCancel}
+          onDelete={() => {}}
+          onClose={handleCancel}
+        />
+      )}
+
+      {proposedCount > 0 && !editingId && (
+        <ConfirmAllButton count={proposedCount} onConfirmAll={handleConfirmAll} />
       )}
 
       <VineMarkers vines={vines} onSelect={onVineSelect} />
@@ -130,24 +177,19 @@ export default function RowLayer({ rows, vineyardId, onChanged, onVineSelect }: 
   )
 }
 
-function RowActionPanel({ row, onConfirm, onEdit, onDelete, onClose }: {
+function RowActionPanel({ row, editing, onConfirm, onEdit, onSave, onCancel, onDelete, onClose }: {
   row: Row
+  editing?: boolean
   onConfirm: () => void
   onEdit: () => void
+  onSave?: () => void
+  onCancel?: () => void
   onDelete: () => void
   onClose: () => void
 }) {
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (ref.current) {
-      L.DomEvent.disableClickPropagation(ref.current)
-    }
-  }, [])
-
   return (
     <div
-      ref={ref}
+      onClick={e => e.stopPropagation()}
       style={{
         position: 'absolute', bottom: 'var(--map-panel-bottom, 20px)', left: '50%', transform: 'translateX(-50%)',
         zIndex: 1000, background: '#fff', borderRadius: 8, padding: '10px 14px',
@@ -160,41 +202,41 @@ function RowActionPanel({ row, onConfirm, onEdit, onDelete, onClose }: {
         {row.status === 'proposed' ? '● Vorschlag' : '● Bestätigt'}
       </span>
       <span style={{ borderLeft: '1px solid #ddd', height: 20 }} />
-      {row.status === 'proposed' && (
-        <button onClick={onConfirm} style={btnStyle('#16a34a')}>✓ Bestätigen</button>
+      {editing ? (
+        <>
+          <button onClick={onSave} style={btnStyle('#16a34a')}>✓ Speichern</button>
+          <button onClick={onCancel} style={btnStyle('#6b7280')}>Abbrechen</button>
+        </>
+      ) : (
+        <>
+          {row.status === 'proposed' && (
+            <button onClick={onConfirm} style={btnStyle('#16a34a')}>✓ Bestätigen</button>
+          )}
+          <button onClick={onEdit} style={btnStyle('#1d4ed8')}>✎ Bearbeiten</button>
+          <button onClick={onDelete} style={btnStyle('#dc2626')}>✕ Löschen</button>
+          <button onClick={onClose} style={{ ...btnStyle('#6b7280'), padding: '3px 6px' }}>✕</button>
+        </>
       )}
-      <button onClick={onEdit} style={btnStyle('#1d4ed8')}>✎ Bearbeiten</button>
-      <button onClick={onDelete} style={btnStyle('#dc2626')}>✕ Löschen</button>
-      <button onClick={onClose} style={{ ...btnStyle('#6b7280'), padding: '3px 6px' }}>✕</button>
     </div>
   )
 }
 
 function btnStyle(bg: string): React.CSSProperties {
-  return {
-    background: bg, color: '#fff', border: 'none', borderRadius: 4,
-    padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 500,
-  }
+  return { background: bg, color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 500 }
 }
 
-function ConfirmAllControl({ count, onConfirmAll }: { count: number; onConfirmAll: () => void }) {
-  const map = useMap()
-  useEffect(() => {
-    const CtrlClass = L.Control.extend({
-      onAdd() {
-        const div = L.DomUtil.create('div')
-        div.style.cssText = 'background:#f59e0b;color:#fff;padding:6px 10px;border-radius:4px;cursor:pointer;font-size:13px;box-shadow:0 1px 4px rgba(0,0,0,0.3)'
-        div.innerHTML = `✓ Alle ${count} Vorschläge bestätigen`
-        L.DomEvent.on(div, 'click', (e) => {
-          L.DomEvent.stopPropagation(e as unknown as L.LeafletMouseEvent)
-          onConfirmAll()
-        })
-        return div
-      },
-    })
-    const ctrl = new CtrlClass({ position: 'topright' })
-    ctrl.addTo(map)
-    return () => { ctrl.remove() }
-  }, [count, map, onConfirmAll])
-  return null
+function ConfirmAllButton({ count, onConfirmAll }: { count: number; onConfirmAll: () => void }) {
+  return (
+    <button
+      onClick={e => { e.stopPropagation(); onConfirmAll() }}
+      style={{
+        position: 'absolute', top: 10, left: '50%', transform: 'translateX(-50%)',
+        zIndex: 1000, background: '#f59e0b', color: '#fff', border: 'none',
+        borderRadius: 4, padding: '6px 12px', cursor: 'pointer', fontSize: 13,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.3)', whiteSpace: 'nowrap',
+      }}
+    >
+      ✓ Alle {count} Vorschläge bestätigen
+    </button>
+  )
 }

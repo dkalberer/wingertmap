@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { Vineyard, Vine } from '../types'
 
-type DrawingMode = 'none' | 'polygon' | 'linestring' | 'point'
+export type DrawingMode = 'none' | 'polygon' | 'linestring' | 'point'
 
 interface MapState {
   center: [number, number]

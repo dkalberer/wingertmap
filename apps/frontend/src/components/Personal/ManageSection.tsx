@@ -32,7 +32,7 @@ export default function ManageSection() {
     <Box sx={{ px: 2, py: 1.5 }}>
       {/* Mitarbeiter */}
       <Typography variant="overline" color="text.secondary">Mitarbeiter</Typography>
-      <List dense disablePadding>
+      <List dense disablePadding sx={{ maxHeight: 160, overflow: 'auto' }}>
         {employees.map((e) => (
           <ListItem
             key={e.id}
@@ -75,7 +75,7 @@ export default function ManageSection() {
           ))}
         </Box>
       )}
-      <List dense disablePadding>
+      <List dense disablePadding sx={{ maxHeight: 200, overflow: 'auto' }}>
         {workTypes.map((wt) => (
           <ListItem
             key={wt.id}

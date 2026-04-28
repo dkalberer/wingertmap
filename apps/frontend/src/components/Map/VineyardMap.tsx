@@ -1,8 +1,10 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
-import {
-  MapContainer, TileLayer, CircleMarker, Popup, Polygon,
-  Tooltip as LeafletTooltip, useMap, useMapEvents,
-} from 'react-leaflet'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import Map, { Source, Layer, Marker, useMap, useControl } from 'react-map-gl/maplibre'
+import type { MapRef, MapLayerMouseEvent } from 'react-map-gl/maplibre'
+import type { TerrainSpecification } from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
+import MapboxDraw from 'maplibre-gl-draw'
+import 'maplibre-gl-draw/dist/mapbox-gl-draw.css'
 import { Box, ToggleButton, ToggleButtonGroup, Tooltip, IconButton, Chip } from '@mui/material'
 import PentagonIcon from '@mui/icons-material/Pentagon'
 import TimelineIcon from '@mui/icons-material/Timeline'
@@ -14,8 +16,9 @@ import AddLocationAltIcon from '@mui/icons-material/AddLocationAlt'
 import TerrainIcon from '@mui/icons-material/Terrain'
 import GradientIcon from '@mui/icons-material/Gradient'
 import HeightIcon from '@mui/icons-material/Height'
-import L from 'leaflet'
+import ViewInArIcon from '@mui/icons-material/ViewInAr'
 import { useMapStore } from '../../store/mapStore'
+import type { DrawingMode } from '../../store/mapStore'
 import { useGPS } from '../../hooks/useGPS'
 import { useVineyardStore } from '../../store/vineyardStore'
 import DrawingTools from './DrawingTools'
@@ -24,50 +27,6 @@ import VineTaskDialog from '../Tasks/VineTaskDialog'
 import type { GeoJSONPolygon, GeoJSONLineString, GeoJSONPoint, Row, Task, Vine, Vineyard } from '../../types'
 import { listRows, createRow } from '../../api/rows'
 import { updateVineyard } from '../../api/vineyards'
-import 'leaflet/dist/leaflet.css'
-
-function FlyToCenter({ center, zoom }: { center: [number, number]; zoom: number }) {
-  const map = useMap()
-  const prevCenter = useRef<[number, number] | null>(null)
-  useEffect(() => {
-    const [lat, lng] = center
-    const prev = prevCenter.current
-    if (prev && prev[0] === lat && prev[1] === lng) return
-    prevCenter.current = center
-    map.flyTo(center, zoom, { duration: 1 })
-  }, [center, zoom, map])
-  return null
-}
-
-// Listens for map clicks when picking mode is active
-function LocationPicker({ onPick }: { onPick: (p: GeoJSONPoint) => void }) {
-  useMapEvents({
-    click(e) {
-      onPick({ type: 'Point', coordinates: [e.latlng.lng, e.latlng.lat] })
-    },
-  })
-  return null
-}
-
-// Task markers on the map
-const taskIcon = L.divIcon({
-  className: '',
-  html: '<div style="width:12px;height:12px;background:#f59e0b;border-radius:50%;border:2px solid white;box-shadow:0 1px 3px rgba(0,0,0,0.4)"></div>',
-  iconSize: [12, 12],
-  iconAnchor: [6, 6],
-})
-
-import { Marker } from 'react-leaflet'
-
-function TaskMarker({ task, onTaskSelect }: { task: Task; onTaskSelect?: (t: Task) => void }) {
-  return (
-    <Marker
-      position={[task.location!.coordinates[1], task.location!.coordinates[0]]}
-      icon={taskIcon}
-      eventHandlers={{ click: () => onTaskSelect?.(task) }}
-    />
-  )
-}
 
 interface Props {
   onDrawComplete?: (geometry: GeoJSONPolygon | GeoJSONLineString) => void
@@ -105,18 +64,7 @@ const OVERLAYS: { key: OverlayKey; label: string; icon: React.ReactNode; url?: s
   },
 ]
 
-function FlyToHandler({ onFlyTo }: { onFlyTo?: (handler: (lat: number, lng: number, zoom?: number) => void) => void }) {
-  const map = useMap()
-  useEffect(() => {
-    if (!onFlyTo) return
-    onFlyTo((lat, lng, zoom) => {
-      map.flyTo([lat, lng], zoom ?? map.getZoom(), { duration: 1 })
-    })
-  }, [map, onFlyTo])
-  return null
-}
-
-/** Approximate WGS84 → LV95 conversion (swisstopo formula, ~1m accuracy) */
+/** Approximate WGS84 → LV95 (~1m accuracy) */
 function wgs84ToLV95(lat: number, lng: number): [number, number] {
   const phi = (lat * 3600 - 169028.66) / 10000
   const lam = (lng * 3600 - 26782.5) / 10000
@@ -125,146 +73,209 @@ function wgs84ToLV95(lat: number, lng: number): [number, number] {
   return [e, n]
 }
 
-function ElevationQuery() {
-  const map = useMap()
-  useMapEvents({
-    click(e) {
-      const [east, north] = wgs84ToLV95(e.latlng.lat, e.latlng.lng)
-      fetch(`https://api3.geo.admin.ch/rest/services/height?easting=${east}&northing=${north}&sr=2056`)
-        .then((r) => r.json())
-        .then((d) => {
-          const h = parseFloat(d.height)
-          if (isNaN(h)) return
-          L.popup({ closeButton: true })
-            .setLatLng(e.latlng)
-            .setContent(`<b>${Math.round(h)} m ü.M.</b>`)
-            .openOn(map)
-        })
-        .catch(() => {})
+function buildMapStyle(baseLayer: BaseLayer, activeOverlays: OverlayKey[]) {
+  const baseUrl = baseLayer === 'luftbild'
+    ? 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg'
+    : 'https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg'
+
+  const sources: Record<string, object> = {
+    'base': {
+      type: 'raster',
+      tiles: [baseUrl],
+      tileSize: 256,
+      maxzoom: baseLayer === 'luftbild' ? 20 : 18,
+      attribution: '© swisstopo',
     },
-  })
+    'terrain-dem': {
+      type: 'raster-dem',
+      tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+      encoding: 'terrarium',
+      tileSize: 256,
+      maxzoom: 15,
+    },
+  }
+
+  const layers: object[] = [
+    { id: 'base-layer', type: 'raster', source: 'base' },
+  ]
+
+  for (const o of OVERLAYS) {
+    if (!o.url || !activeOverlays.includes(o.key)) continue
+    sources[o.key] = { type: 'raster', tiles: [o.url], tileSize: 256, maxzoom: 18 }
+    layers.push({ id: `${o.key}-layer`, type: 'raster', source: o.key, paint: { 'raster-opacity': o.opacity ?? 1 } })
+  }
+
+  return { version: 8 as const, sources, layers }
+}
+
+function DrawControlMount({ onReady }: { onReady: (draw: MapboxDraw) => void }) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const draw = useControl<any>(() => new MapboxDraw({ displayControlsDefault: false, controls: {} }))
+  useEffect(() => { onReady(draw) }, [draw, onReady])
   return null
 }
 
-function VineyardActionPanel({ vineyard, onEdit, onClose }: {
-  vineyard: Vineyard
-  onEdit: () => void
-  onClose: () => void
-}) {
-  const ref = useRef<HTMLDivElement>(null)
-  useEffect(() => { if (ref.current) L.DomEvent.disableClickPropagation(ref.current) }, [])
-  return (
-    <div ref={ref} style={{
-      position: 'absolute', bottom: 'var(--map-panel-bottom, 20px)', left: '50%', transform: 'translateX(-50%)',
-      zIndex: 1000, background: '#fff', borderRadius: 8, padding: '10px 14px',
-      boxShadow: '0 2px 12px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', gap: 10,
-      fontSize: 13, whiteSpace: 'nowrap',
-    }}>
-      <strong>{vineyard.name}</strong>
-      <span style={{ borderLeft: '1px solid #ddd', height: 20 }} />
-      {vineyard.boundary && (
-        <button onClick={onEdit} style={vBtnStyle('#1d4ed8')}>✎ Grenze bearbeiten</button>
-      )}
-      <button onClick={onClose} style={{ ...vBtnStyle('#6b7280'), padding: '3px 6px' }}>✕</button>
-    </div>
-  )
+function FlyToHandler({ onFlyTo }: { onFlyTo?: (handler: (lat: number, lng: number, zoom?: number) => void) => void }) {
+  const { current: map } = useMap()
+  useEffect(() => {
+    if (!onFlyTo || !map) return
+    onFlyTo((lat, lng, zoom) => {
+      map.getMap().flyTo({ center: [lng, lat], zoom: zoom ?? map.getZoom(), duration: 1000 })
+    })
+  }, [map, onFlyTo])
+  return null
 }
 
-function vBtnStyle(bg: string): import('react').CSSProperties {
-  return { background: bg, color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 500 }
-}
-
-function VineyardBoundaries({ vineyards, selectedVineyardId, onVineyardClick, onBoundaryUpdated, pickingLocation }: {
+function VineyardBoundaries({ vineyards, selectedVineyardId, panelVineyard, editingId, onBoundaryUpdated, drawRef, setDrawingMode, onPanelClose, onEditingChange }: {
   vineyards: Vineyard[]
   selectedVineyardId?: string | null
-  onVineyardClick?: (v: Vineyard) => void
+  panelVineyard: Vineyard | null
+  editingId: string | null
   onBoundaryUpdated: () => void
-  pickingLocation: boolean
+  drawRef: React.RefObject<MapboxDraw | null>
+  setDrawingMode: (mode: DrawingMode) => void
+  onPanelClose: () => void
+  onEditingChange: (id: string | null) => void
 }) {
-  const map = useMap()
-  const [panelVineyard, setPanelVineyard] = useState<Vineyard | null>(null)
-  const [editingId, setEditingId] = useState<string | null>(null)
+  const editFeatureIdRef = useRef<string | null>(null)
 
-  function handlePolygonClick(v: Vineyard) {
-    if (pickingLocation) return
-    if (v.id === selectedVineyardId) {
-      setPanelVineyard((prev) => prev?.id === v.id ? null : v)
-    } else {
-      setPanelVineyard(null)
-      onVineyardClick?.(v)
-    }
-  }
+  const geojson = useMemo(() => ({
+    type: 'FeatureCollection' as const,
+    features: vineyards
+      .filter(v => v.boundary && v.id !== editingId)
+      .map(v => ({
+        type: 'Feature' as const,
+        id: v.id,
+        properties: { id: v.id, name: v.name, selected: v.id === selectedVineyardId },
+        geometry: v.boundary!,
+      })),
+  }), [vineyards, selectedVineyardId, editingId])
 
   async function handleEdit(v: Vineyard) {
-    if (!v.boundary) return
-    setPanelVineyard(null)
-    setEditingId(v.id)
-
-    const coords = v.boundary.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number])
-    const poly = L.polygon(coords, { color: '#1d4ed8', weight: 2 }).addTo(map)
-    const editHandler = new (L.EditToolbar.Edit as any)(map, { featureGroup: L.featureGroup([poly]) })
-    editHandler.enable()
-
-    function cancel() {
-      map.off('click', onSave)
-      editHandler.disable()
-      try { map.removeLayer(poly) } catch {}
-      setEditingId(null)
-      document.removeEventListener('keydown', onEscape)
-    }
-
-    async function onSave() {
-      editHandler.save()
-      const rings = poly.getLatLngs() as L.LatLng[][]
-      cancel()
-      const ring = rings[0] as L.LatLng[]
-      if (ring && ring.length >= 3) {
-        const closed = [...ring.map((ll): [number, number] => [ll.lng, ll.lat]), [ring[0].lng, ring[0].lat] as [number, number]]
-        const boundary: GeoJSONPolygon = { type: 'Polygon', coordinates: [closed] }
-        await updateVineyard(v.id, { name: v.name, description: v.description, boundary })
-        onBoundaryUpdated()
-      }
-    }
-
-    function onEscape(e: KeyboardEvent) {
-      if (e.key === 'Escape') cancel()
-    }
-
-    map.once('click', onSave)
-    document.addEventListener('keydown', onEscape)
+    if (!v.boundary || !drawRef.current) return
+    onPanelClose()
+    setDrawingMode('none')
+    const feature = { type: 'Feature' as const, properties: {}, geometry: v.boundary }
+    const ids = drawRef.current.add(feature)
+    const featureId = String(ids[0])
+    editFeatureIdRef.current = featureId
+    drawRef.current.changeMode('direct_select', { featureId })
+    onEditingChange(v.id)
   }
+
+  async function handleSave(v: Vineyard) {
+    const draw = drawRef.current
+    if (!draw || !editFeatureIdRef.current) return
+    const all = draw.getAll()
+    const feat = all.features.find(f => f.id === editFeatureIdRef.current)
+    draw.deleteAll()
+    editFeatureIdRef.current = null
+    onEditingChange(null)
+    if (feat?.geometry?.type === 'Polygon') {
+      const boundary = feat.geometry as GeoJSONPolygon
+      await updateVineyard(v.id, { name: v.name, description: v.description, boundary })
+      onBoundaryUpdated()
+    }
+  }
+
+  function handleCancel() {
+    drawRef.current?.deleteAll()
+    editFeatureIdRef.current = null
+    onEditingChange(null)
+  }
+
+  const editingVineyard = editingId ? vineyards.find(v => v.id === editingId) ?? null : null
 
   return (
     <>
-      {vineyards.map((v) => {
-        if (!v.boundary || editingId === v.id) return null
-        const positions = v.boundary.coordinates[0].map(([lng, lat]) => [lat, lng] as [number, number])
-        const isSelected = v.id === selectedVineyardId
-        return (
-          <Polygon
-            key={v.id}
-            positions={positions}
-            pathOptions={{
-              color: isSelected ? '#15803d' : '#6b7280',
-              fillColor: isSelected ? '#15803d' : '#6b7280',
-              fillOpacity: isSelected ? 0.15 : 0.08,
-              weight: isSelected ? 2.5 : 1.5,
-            }}
-            eventHandlers={{ click: () => handlePolygonClick(v) }}
-          >
-            <LeafletTooltip>{v.name}</LeafletTooltip>
-          </Polygon>
-        )
-      })}
+      <Source id="vineyards" type="geojson" data={geojson}>
+        <Layer
+          id="vineyard-fill"
+          type="fill"
+          paint={{
+            'fill-color': ['case', ['==', ['get', 'selected'], true], '#15803d', '#6b7280'] as any,
+            'fill-opacity': ['case', ['==', ['get', 'selected'], true], 0.15, 0.08] as any,
+          }}
+        />
+        <Layer
+          id="vineyard-border"
+          type="line"
+          paint={{
+            'line-color': ['case', ['==', ['get', 'selected'], true], '#15803d', '#6b7280'] as any,
+            'line-width': ['case', ['==', ['get', 'selected'], true], 2.5, 1.5] as any,
+          }}
+        />
+        <Layer
+          id="vineyard-label"
+          type="symbol"
+          layout={{ 'text-field': ['get', 'name'], 'text-size': 12, 'text-anchor': 'center' } as any}
+          paint={{ 'text-color': '#374151', 'text-halo-color': '#fff', 'text-halo-width': 1 }}
+        />
+      </Source>
+
       {panelVineyard && (
         <VineyardActionPanel
           vineyard={panelVineyard}
+          editing={editingId === panelVineyard.id}
           onEdit={() => handleEdit(panelVineyard)}
-          onClose={() => setPanelVineyard(null)}
+          onSave={() => { handleSave(panelVineyard); onPanelClose() }}
+          onCancel={() => { handleCancel(); onPanelClose() }}
+          onClose={onPanelClose}
+        />
+      )}
+      {editingVineyard && !panelVineyard && (
+        <VineyardActionPanel
+          vineyard={editingVineyard}
+          editing
+          onEdit={() => {}}
+          onSave={() => handleSave(editingVineyard)}
+          onCancel={handleCancel}
+          onClose={handleCancel}
         />
       )}
     </>
   )
+}
+
+function VineyardActionPanel({ vineyard, editing, onEdit, onSave, onCancel, onClose }: {
+  vineyard: Vineyard
+  editing: boolean
+  onEdit: () => void
+  onSave: () => void
+  onCancel: () => void
+  onClose: () => void
+}) {
+  return (
+    <div
+      onClick={e => e.stopPropagation()}
+      style={{
+        position: 'absolute', bottom: 'var(--map-panel-bottom, 20px)', left: '50%', transform: 'translateX(-50%)',
+        zIndex: 1000, background: '#fff', borderRadius: 8, padding: '10px 14px',
+        boxShadow: '0 2px 12px rgba(0,0,0,0.25)', display: 'flex', alignItems: 'center', gap: 10,
+        fontSize: 13, whiteSpace: 'nowrap',
+      }}
+    >
+      <strong>{vineyard.name}</strong>
+      <span style={{ borderLeft: '1px solid #ddd', height: 20 }} />
+      {editing ? (
+        <>
+          <button onClick={onSave} style={vBtnStyle('#16a34a')}>✓ Speichern</button>
+          <button onClick={onCancel} style={vBtnStyle('#6b7280')}>Abbrechen</button>
+        </>
+      ) : (
+        <>
+          {vineyard.boundary && (
+            <button onClick={onEdit} style={vBtnStyle('#1d4ed8')}>✎ Grenze bearbeiten</button>
+          )}
+          <button onClick={onClose} style={{ ...vBtnStyle('#6b7280'), padding: '3px 6px' }}>✕</button>
+        </>
+      )}
+    </div>
+  )
+}
+
+function vBtnStyle(bg: string): React.CSSProperties {
+  return { background: bg, color: '#fff', border: 'none', borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontWeight: 500 }
 }
 
 export default function VineyardMap({
@@ -277,14 +288,17 @@ export default function VineyardMap({
   const [gpsActive, setGpsActive] = useState(false)
   const [baseLayer, setBaseLayer] = useState<BaseLayer>('karte')
   const [activeOverlays, setActiveOverlays] = useState<OverlayKey[]>([])
-
-  function toggleOverlay(key: OverlayKey) {
-    setActiveOverlays((prev) =>
-      prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]
-    )
-  }
+  const [is3D, setIs3D] = useState(false)
+  const [terrain, setTerrain] = useState<TerrainSpecification | undefined>(undefined)
   const [rows, setRows] = useState<Row[]>([])
   const [selectedVine, setSelectedVine] = useState<Vine | null>(null)
+  const [elevationPopup, setElevationPopup] = useState<{ lat: number; lng: number; height: number } | null>(null)
+  const [vineyardPanel, setVineyardPanel] = useState<Vineyard | null>(null)
+  const [editingVineyardId, setEditingVineyardId] = useState<string | null>(null)
+  const mapRef = useRef<MapRef>(null)
+  const drawRef = useRef<MapboxDraw | null>(null)
+
+  const mapStyle = useMemo(() => buildMapStyle(baseLayer, activeOverlays), [baseLayer, activeOverlays])
 
   const loadRows = useCallback(async () => {
     if (!selectedVineyardId) { setRows([]); return }
@@ -294,9 +308,27 @@ export default function VineyardMap({
 
   useEffect(() => { loadRows() }, [loadRows])
 
+  function toggleOverlay(key: OverlayKey) {
+    setActiveOverlays(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
+  }
+
   function toggleGPS() {
     if (gpsActive) { stopWatching(); setGpsActive(false) }
     else { startWatching(); setGpsActive(true) }
+  }
+
+  function toggle3D() {
+    const map = mapRef.current?.getMap()
+    if (!map) return
+    if (is3D) {
+      setTerrain(undefined)
+      map.easeTo({ pitch: 0, bearing: 0, duration: 800 })
+      setIs3D(false)
+    } else {
+      setTerrain({ source: 'terrain-dem', exaggeration: 1.5 })
+      map.easeTo({ pitch: 50, bearing: -15, duration: 800 })
+      setIs3D(true)
+    }
   }
 
   const onDrawCompleteRef = useRef(onDrawComplete)
@@ -312,6 +344,44 @@ export default function VineyardMap({
     onDrawCompleteRef.current?.(geometry)
   }, [loadRows])
 
+  function handleMapClick(e: MapLayerMouseEvent) {
+    if (pickingLocation && onLocationPicked) {
+      onLocationPicked({ type: 'Point', coordinates: [e.lngLat.lng, e.lngLat.lat] })
+      return
+    }
+
+    // Vineyard feature click (via interactiveLayerIds)
+    const features = e.features ?? []
+    if (features.length > 0 && !editingVineyardId) {
+      const vid = features[0].properties?.id
+      const v = vineyards.find(x => x.id === vid)
+      if (v) {
+        if (v.id === selectedVineyardId) {
+          setVineyardPanel(prev => prev?.id === v.id ? null : v)
+        } else {
+          setVineyardPanel(null)
+          onVineyardClick?.(v)
+        }
+        return
+      }
+    }
+
+    setVineyardPanel(null)
+
+    // Elevation query
+    if (activeOverlays.includes('hoehe')) {
+      setElevationPopup(null)
+      const [east, north] = wgs84ToLV95(e.lngLat.lat, e.lngLat.lng)
+      fetch(`https://api3.geo.admin.ch/rest/services/height?easting=${east}&northing=${north}&sr=2056`)
+        .then(r => r.json())
+        .then(d => {
+          const h = parseFloat(d.height)
+          if (!isNaN(h)) setElevationPopup({ lat: e.lngLat.lat, lng: e.lngLat.lng, height: Math.round(h) })
+        })
+        .catch(() => {})
+    }
+  }
+
   return (
     <Box
       data-testid="vineyard-map"
@@ -320,76 +390,79 @@ export default function VineyardMap({
         cursor: pickingLocation ? 'crosshair' : undefined,
       }}
     >
-      <MapContainer center={center} zoom={zoom} maxZoom={22} style={{ height: '100%', width: '100%' }}>
-        {baseLayer === 'luftbild' ? (
-          <TileLayer
-            url="https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.swissimage/default/current/3857/{z}/{x}/{y}.jpeg"
-            attribution="&copy; swisstopo"
-            maxNativeZoom={20}
-            maxZoom={22}
-          />
-        ) : (
-          <TileLayer
-            url="https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg"
-            attribution="&copy; swisstopo"
-            maxNativeZoom={18}
-            maxZoom={22}
-          />
-        )}
-        <FlyToCenter center={center} zoom={zoom} />
+      <Map
+        ref={mapRef}
+        initialViewState={{ longitude: center[1], latitude: center[0], zoom, pitch: 0, bearing: 0 }}
+        mapStyle={mapStyle as any}
+        maxZoom={22}
+        terrain={terrain}
+        interactiveLayerIds={['vineyard-fill']}
+        onClick={handleMapClick}
+        style={{ width: '100%', height: '100%' }}
+      >
+        <DrawControlMount onReady={draw => { drawRef.current = draw }} />
         <FlyToHandler onFlyTo={onFlyTo} />
-
-        {OVERLAYS.filter((o) => o.url && activeOverlays.includes(o.key)).map((o) => (
-          <TileLayer key={o.key} url={o.url!} opacity={o.opacity} maxNativeZoom={18} maxZoom={22} />
-        ))}
-        {activeOverlays.includes('hoehe') && !pickingLocation && <ElevationQuery />}
 
         <VineyardBoundaries
           vineyards={vineyards}
           selectedVineyardId={selectedVineyardId}
-          onVineyardClick={onVineyardClick}
+          panelVineyard={vineyardPanel}
+          editingId={editingVineyardId}
           onBoundaryUpdated={reloadVineyards}
-          pickingLocation={pickingLocation}
+          drawRef={drawRef}
+          setDrawingMode={setDrawingMode}
+          onPanelClose={() => setVineyardPanel(null)}
+          onEditingChange={setEditingVineyardId}
         />
 
-        {/* Task markers */}
-        {tasks.filter((t) => t.location).map((t) => (
-          <TaskMarker key={t.id} task={t} onTaskSelect={onTaskSelect} />
-        ))}
-
-        <DrawingTools onDrawComplete={handleDrawComplete} />
         {selectedVineyardId && (
           <RowLayer
             rows={rows}
             vineyardId={selectedVineyardId}
             onChanged={loadRows}
             onVineSelect={setSelectedVine}
+            drawRef={drawRef}
           />
         )}
-        {position && (
-          <CircleMarker
-            center={[position.lat, position.lng]}
-            radius={8}
-            pathOptions={{ color: '#1976d2', fillColor: '#1976d2', fillOpacity: 0.9 }}
+
+        <DrawingTools onDrawComplete={handleDrawComplete} drawRef={drawRef} />
+
+        {tasks.filter(t => t.location).map(t => (
+          <Marker
+            key={t.id}
+            longitude={t.location!.coordinates[0]}
+            latitude={t.location!.coordinates[1]}
+            onClick={() => onTaskSelect?.(t)}
           >
-            <Popup>Mein Standort<br />±{Math.round(position.accuracy)} m</Popup>
-          </CircleMarker>
+            <div style={{ width: 12, height: 12, background: '#f59e0b', borderRadius: '50%', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.4)', cursor: 'pointer' }} />
+          </Marker>
+        ))}
+
+        {position && (
+          <Marker longitude={position.lng} latitude={position.lat}>
+            <div style={{ width: 16, height: 16, background: '#1976d2', borderRadius: '50%', border: '2px solid white', opacity: 0.9 }} />
+          </Marker>
         )}
-        {pickingLocation && onLocationPicked && (
-          <LocationPicker onPick={onLocationPicked} />
+
+        {elevationPopup && (
+          <Marker longitude={elevationPopup.lng} latitude={elevationPopup.lat} anchor="bottom">
+            <div onClick={e => e.stopPropagation()} style={{
+              background: '#fff', padding: '4px 10px', borderRadius: 6,
+              boxShadow: '0 1px 6px rgba(0,0,0,0.3)', fontSize: 13, fontWeight: 600,
+              display: 'flex', gap: 6, alignItems: 'center',
+            }}>
+              {elevationPopup.height} m ü.M.
+              <button onClick={() => setElevationPopup(null)} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 0, lineHeight: 1 }}>×</button>
+            </div>
+          </Marker>
         )}
-      </MapContainer>
+      </Map>
 
       <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 1 }}>
         {pickingLocation && (
-          <Chip
-            label="Standort wählen…"
-            color="warning"
-            size="small"
-            icon={<AddLocationAltIcon />}
-            sx={{ alignSelf: 'flex-end' }}
-          />
+          <Chip label="Standort wählen…" color="warning" size="small" icon={<AddLocationAltIcon />} sx={{ alignSelf: 'flex-end' }} />
         )}
+
         <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, boxShadow: 2 }}>
           <ToggleButtonGroup
             orientation="vertical"
@@ -423,6 +496,14 @@ export default function VineyardMap({
           <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, boxShadow: 2 }}>
             <IconButton size="small" onClick={() => setBaseLayer(b => b === 'karte' ? 'luftbild' : 'karte')} aria-label="Kartenebene">
               {baseLayer === 'karte' ? <SatelliteAltIcon fontSize="small" /> : <MapIcon fontSize="small" />}
+            </IconButton>
+          </Box>
+        </Tooltip>
+
+        <Tooltip title={is3D ? '2D Ansicht' : '3D Ansicht'} placement="left">
+          <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, boxShadow: 2 }}>
+            <IconButton size="small" onClick={toggle3D} color={is3D ? 'primary' : 'default'} aria-label="3D Ansicht">
+              <ViewInArIcon fontSize="small" />
             </IconButton>
           </Box>
         </Tooltip>
