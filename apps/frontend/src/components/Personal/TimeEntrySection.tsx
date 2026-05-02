@@ -20,7 +20,7 @@ interface Props {
 export default function TimeEntrySection({ vineyard }: Props) {
   const { employees, workTypes, entries, year, setYear, createEntry, removeEntry } = usePersonalStore()
   const [showForm, setShowForm] = useState(false)
-  const [employeeId, setEmployeeId] = useState('')
+  const [employeeIds, setEmployeeIds] = useState<string[]>([])
   const [workTypeId, setWorkTypeId] = useState('')
   const [entryDate, setEntryDate] = useState(new Date().toISOString().slice(0, 10))
   const [hours, setHours] = useState('')
@@ -51,19 +51,21 @@ export default function TimeEntrySection({ vineyard }: Props) {
   }
 
   async function handleSubmit() {
-    if (!employeeId || !entryDate || !hours) return
+    if (employeeIds.length === 0 || !entryDate || !hours) return
     setSaving(true)
     try {
-      await createEntry({
-        employeeId,
-        workTypeId: workTypeId || undefined,
-        vineyardId: vineyard?.id || undefined,
-        entryDate,
-        hours: parseFloat(hours),
-        description: description || undefined,
-      })
+      await Promise.all(employeeIds.map((employeeId) =>
+        createEntry({
+          employeeId,
+          workTypeId: workTypeId || undefined,
+          vineyardId: vineyard?.id || undefined,
+          entryDate,
+          hours: parseFloat(hours),
+          description: description || undefined,
+        })
+      ))
       setShowForm(false)
-      setEmployeeId('')
+      setEmployeeIds([])
       setWorkTypeId('')
       setHours('')
       setDescription('')
@@ -159,11 +161,16 @@ export default function TimeEntrySection({ vineyard }: Props) {
           <Select
             size="small"
             displayEmpty
-            value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
+            multiple
+            value={employeeIds}
+            onChange={(e) => setEmployeeIds(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value as string[])}
+            renderValue={(selected) =>
+              (selected as string[]).length === 0
+                ? 'Mitarbeiter wählen'
+                : employees.filter((e) => (selected as string[]).includes(e.id)).map((e) => e.name).join(', ')
+            }
             fullWidth
           >
-            <MenuItem value="" disabled>Mitarbeiter wählen</MenuItem>
             {employees.map((e) => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
           </Select>
 
@@ -210,7 +217,7 @@ export default function TimeEntrySection({ vineyard }: Props) {
               size="small"
               variant="contained"
               onClick={handleSubmit}
-              disabled={saving || !employeeId || !hours}
+              disabled={saving || employeeIds.length === 0 || !hours}
             >
               Speichern
             </Button>
