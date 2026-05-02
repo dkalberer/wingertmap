@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import {
-  Box, Button, Divider, IconButton, List, ListItem, ListItemText,
+  Box, Button, Chip, Divider, IconButton, List, ListItem, ListItemText,
   MenuItem, Select, TextField, Typography, Alert,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
@@ -158,21 +158,21 @@ export default function TimeEntrySection({ vineyard }: Props) {
 
       {showForm ? (
         <Box sx={{ px: 2, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-          <Select
-            size="small"
-            displayEmpty
-            multiple
-            value={employeeIds}
-            onChange={(e) => setEmployeeIds(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value as string[])}
-            renderValue={(selected) =>
-              (selected as string[]).length === 0
-                ? 'Mitarbeiter wählen'
-                : employees.filter((e) => (selected as string[]).includes(e.id)).map((e) => e.name).join(', ')
-            }
-            fullWidth
-          >
-            {employees.map((e) => <MenuItem key={e.id} value={e.id}>{e.name}</MenuItem>)}
-          </Select>
+          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+            {employees.map((e) => {
+              const selected = employeeIds.includes(e.id)
+              return (
+                <Chip
+                  key={e.id}
+                  label={e.name}
+                  onClick={() => setEmployeeIds(selected ? employeeIds.filter((id) => id !== e.id) : [...employeeIds, e.id])}
+                  color={selected ? 'primary' : 'default'}
+                  variant={selected ? 'filled' : 'outlined'}
+                  size="small"
+                />
+              )
+            })}
+          </Box>
 
           <Select
             size="small"
