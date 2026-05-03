@@ -25,10 +25,9 @@ interface Props {
   onDelete?: (id: string) => void
 }
 
-const statusColor: Record<TaskStatus, 'default' | 'warning' | 'success'> = {
-  offen:          'default',
-  in_bearbeitung: 'warning',
-  erledigt:       'success',
+const statusColor: Record<TaskStatus, 'default' | 'success'> = {
+  offen:    'default',
+  erledigt: 'success',
 }
 
 function isOverdue(task: Task): boolean {

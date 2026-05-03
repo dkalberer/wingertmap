@@ -1,7 +1,6 @@
 import { Box, Typography, IconButton } from '@mui/material'
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked'
 import CheckCircleIcon from '@mui/icons-material/CheckCircle'
-import RadioButtonCheckedIcon from '@mui/icons-material/RadioButtonChecked'
 import PlaceIcon from '@mui/icons-material/Place'
 import ChevronRightIcon from '@mui/icons-material/ChevronRight'
 import type { Task, TaskStatus } from '../../types'
@@ -25,7 +24,6 @@ const CATEGORY_ACCENT: Record<string, string> = {
 
 export default function TaskRow({ task, onStatusChange, onSelect }: Props) {
   const done = task.status === 'erledigt'
-  const inProgress = task.status === 'in_bearbeitung'
   const overdue = isOverdue(task)
   const today = isDueToday(task)
   const accentColor = CATEGORY_ACCENT[task.category] ?? '#64748b'
@@ -41,7 +39,7 @@ export default function TaskRow({ task, onStatusChange, onSelect }: Props) {
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(task) } }}
-      aria-label={`${task.title || labelForCategory(task.category)}, ${done ? 'erledigt' : inProgress ? 'in Bearbeitung' : 'offen'}`}
+      aria-label={`${task.title || labelForCategory(task.category)}, ${done ? 'erledigt' : 'offen'}`}
       sx={{
         display: 'flex',
         alignItems: 'center',
@@ -83,7 +81,7 @@ export default function TaskRow({ task, onStatusChange, onSelect }: Props) {
         aria-label={done ? 'Als offen markieren' : 'Als erledigt markieren'}
         sx={{
           p: 0.75,
-          color: done ? 'success.main' : inProgress ? 'warning.main' : 'action.disabled',
+          color: done ? 'success.main' : 'action.disabled',
           transition: 'color 0.15s',
           '&:hover': {
             color: done ? 'action.disabled' : 'success.main',
@@ -91,11 +89,7 @@ export default function TaskRow({ task, onStatusChange, onSelect }: Props) {
           },
         }}
       >
-        {done
-          ? <CheckCircleIcon fontSize="small" />
-          : inProgress
-            ? <RadioButtonCheckedIcon fontSize="small" />
-            : <RadioButtonUncheckedIcon fontSize="small" />}
+        {done ? <CheckCircleIcon fontSize="small" /> : <RadioButtonUncheckedIcon fontSize="small" />}
       </IconButton>
 
       {/* Content */}

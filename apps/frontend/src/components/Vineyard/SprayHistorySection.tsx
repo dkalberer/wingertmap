@@ -10,15 +10,13 @@ interface Props {
 }
 
 const STATUS_COLOR: Record<Task['status'], 'default' | 'warning' | 'success'> = {
-  offen:          'warning',
-  in_bearbeitung: 'warning',
-  erledigt:       'success',
+  offen:    'warning',
+  erledigt: 'success',
 }
 
 const STATUS_LABEL: Record<Task['status'], string> = {
-  offen:          'offen',
-  in_bearbeitung: 'geplant',
-  erledigt:       'erledigt',
+  offen:    'offen',
+  erledigt: 'erledigt',
 }
 
 function taskDate(t: Task): string {

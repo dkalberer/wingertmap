@@ -119,7 +119,7 @@ export const handlers = [
   http.get('/api/vines/:vineId/tasks', () => HttpResponse.json([mockTask])),
   http.get('/api/tasks', () => HttpResponse.json([mockTask])),
   http.post('/api/tasks', () => HttpResponse.json(mockTask, { status: 201 })),
-  http.patch('/api/tasks/:id/status', () => HttpResponse.json({ ...mockTask, status: 'in_bearbeitung' })),
+  http.patch('/api/tasks/:id/status', () => HttpResponse.json({ ...mockTask, status: 'erledigt' })),
 
   http.get('/api/vineyards/:id/weather', () => HttpResponse.json(mockWeather)),
   http.get('/api/vineyards/:id/plant-protection-status', () => HttpResponse.json(mockProtection)),

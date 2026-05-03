@@ -66,7 +66,7 @@ export interface Vine {
   createdAt: string
 }
 
-export type GrapeColor = 'weiss' | 'rot' | 'rose'
+export type GrapeColor = 'weiss' | 'rot'
 
 export interface GrapeVariety {
   id: string
@@ -89,7 +89,7 @@ export interface Harvest {
   createdAt: string
 }
 
-export type TaskStatus = 'offen' | 'in_bearbeitung' | 'erledigt'
+export type TaskStatus = 'offen' | 'erledigt'
 export type RecordType = 'aufgabe' | 'beobachtung'
 export type TaskCategory = 'pflanzenschutz' | 'rebenpflege' | 'infrastruktur' | 'boden' | 'phaenologie' | 'sonstiges'
 export type Severity = 'niedrig' | 'mittel' | 'hoch'

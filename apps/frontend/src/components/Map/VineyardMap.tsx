@@ -5,9 +5,7 @@ import type { TerrainSpecification } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import MapboxDraw from 'maplibre-gl-draw'
 import 'maplibre-gl-draw/dist/mapbox-gl-draw.css'
-import { Box, ToggleButton, ToggleButtonGroup, Tooltip, IconButton, Chip } from '@mui/material'
-import PentagonIcon from '@mui/icons-material/Pentagon'
-import TimelineIcon from '@mui/icons-material/Timeline'
+import { Box, ToggleButton, ToggleButtonGroup, Tooltip, IconButton, Chip, Button } from '@mui/material'
 import GpsFixedIcon from '@mui/icons-material/GpsFixed'
 import GpsOffIcon from '@mui/icons-material/GpsOff'
 import MapIcon from '@mui/icons-material/Map'
@@ -35,6 +33,7 @@ interface Props {
   tasks?: Task[]
   pickingLocation?: boolean
   onLocationPicked?: (p: GeoJSONPoint) => void
+  onCancelPicking?: () => void
   onFlyTo?: (handler: (lat: number, lng: number, zoom?: number) => void) => void
   onTaskSelect?: (task: Task) => void
 }
@@ -280,7 +279,7 @@ function vBtnStyle(bg: string): React.CSSProperties {
 
 export default function VineyardMap({
   onDrawComplete, selectedVineyardId, onVineyardClick,
-  tasks = [], pickingLocation = false, onLocationPicked, onFlyTo, onTaskSelect,
+  tasks = [], pickingLocation = false, onLocationPicked, onCancelPicking, onFlyTo, onTaskSelect,
 }: Props) {
   const { center, zoom, drawingMode, setDrawingMode } = useMapStore()
   const { vineyards, load: reloadVineyards } = useVineyardStore()
@@ -335,6 +334,34 @@ export default function VineyardMap({
   useEffect(() => { onDrawCompleteRef.current = onDrawComplete }, [onDrawComplete])
   const selectedVineyardIdRef = useRef(selectedVineyardId)
   useEffect(() => { selectedVineyardIdRef.current = selectedVineyardId }, [selectedVineyardId])
+  const pickingLocationRef = useRef(pickingLocation)
+  useEffect(() => { pickingLocationRef.current = pickingLocation }, [pickingLocation])
+  const onLocationPickedRef = useRef(onLocationPicked)
+  useEffect(() => { onLocationPickedRef.current = onLocationPicked }, [onLocationPicked])
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null)
+  const lastPickTimeRef = useRef(0)
+
+  function handleTouchStart(e: React.TouchEvent) {
+    if (!pickingLocationRef.current) return
+    const t = e.touches[0]
+    touchStartRef.current = { x: t.clientX, y: t.clientY }
+  }
+
+  function handleTouchEnd(e: React.TouchEvent) {
+    if (!pickingLocationRef.current || !onLocationPickedRef.current || !touchStartRef.current || !mapRef.current) return
+    const t = e.changedTouches[0]
+    const dx = t.clientX - touchStartRef.current.x
+    const dy = t.clientY - touchStartRef.current.y
+    touchStartRef.current = null
+    if (Math.sqrt(dx * dx + dy * dy) > 15) return // pan gesture, not a tap
+    // Debounce to avoid double-firing with the map's click event
+    const now = Date.now()
+    if (now - lastPickTimeRef.current < 600) return
+    lastPickTimeRef.current = now
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    const lngLat = mapRef.current.getMap().unproject([t.clientX - rect.left, t.clientY - rect.top])
+    onLocationPickedRef.current({ type: 'Point', coordinates: [lngLat.lng, lngLat.lat] })
+  }
 
   const handleDrawComplete = useCallback(async (geometry: GeoJSONPolygon | GeoJSONLineString) => {
     if (geometry.type === 'LineString' && selectedVineyardIdRef.current) {
@@ -345,8 +372,12 @@ export default function VineyardMap({
   }, [loadRows])
 
   function handleMapClick(e: MapLayerMouseEvent) {
-    if (pickingLocation && onLocationPicked) {
-      onLocationPicked({ type: 'Point', coordinates: [e.lngLat.lng, e.lngLat.lat] })
+    if (pickingLocationRef.current && onLocationPickedRef.current) {
+      // On mobile, touchend already handled this — skip if fired recently
+      const now = Date.now()
+      if (now - lastPickTimeRef.current < 600) return
+      lastPickTimeRef.current = now
+      onLocationPickedRef.current({ type: 'Point', coordinates: [e.lngLat.lng, e.lngLat.lat] })
       return
     }
 
@@ -385,6 +416,8 @@ export default function VineyardMap({
   return (
     <Box
       data-testid="vineyard-map"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       sx={{
         width: '100%', flex: 1, minHeight: 0, position: 'relative',
         cursor: pickingLocation ? 'crosshair' : undefined,
@@ -427,7 +460,7 @@ export default function VineyardMap({
 
         <DrawingTools onDrawComplete={handleDrawComplete} drawRef={drawRef} />
 
-        {tasks.filter(t => t.location).map(t => (
+        {!pickingLocation && tasks.filter(t => t.location).map(t => (
           <Marker
             key={t.id}
             longitude={t.location!.coordinates[0]}
@@ -458,31 +491,58 @@ export default function VineyardMap({
         )}
       </Map>
 
-      <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', gap: 1 }}>
-        {pickingLocation && (
-          <Chip label="Standort wählen…" color="warning" size="small" icon={<AddLocationAltIcon />} sx={{ alignSelf: 'flex-end' }} />
-        )}
-
-        <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, boxShadow: 2 }}>
-          <ToggleButtonGroup
-            orientation="vertical"
-            value={drawingMode === 'none' ? null : drawingMode}
-            exclusive
-            onChange={(_, v) => { setDrawingMode(v ?? 'none') }}
+      {/* Cancel bar — shown when picking a location or drawing on the map */}
+      {(pickingLocation || (drawingMode && drawingMode !== 'none')) && (
+        <Box
+          onClick={(e) => e.stopPropagation()}
+          sx={{
+            position: 'absolute',
+            bottom: 'calc(var(--map-panel-bottom, 20px) + 8px)',
+            left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000,
+            bgcolor: 'background.paper',
+            borderRadius: 3,
+            boxShadow: 4,
+            px: 2,
+            py: 1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <Chip
+            icon={<AddLocationAltIcon />}
+            label={
+              pickingLocation ? 'Standort auf Karte tippen' :
+              drawingMode === 'polygon' ? 'Wingertfläche zeichnen' :
+              'Reihe zeichnen'
+            }
+            color="warning"
             size="small"
+            variant="outlined"
+          />
+          <Button
+            size="small"
+            variant="outlined"
+            color="inherit"
+            onClick={() => {
+              if (pickingLocation) {
+                onCancelPicking?.()
+              } else {
+                drawRef.current?.deleteAll()
+                setDrawingMode('none')
+              }
+            }}
+            sx={{ minHeight: 32, borderRadius: 2, fontSize: '0.8rem' }}
           >
-            <Tooltip title="Wingert zeichnen" placement="left">
-              <ToggleButton value="polygon" aria-label="Wingert zeichnen">
-                <PentagonIcon fontSize="small" />
-              </ToggleButton>
-            </Tooltip>
-            <Tooltip title="Reihe zeichnen" placement="left">
-              <ToggleButton value="linestring" aria-label="Reihe zeichnen">
-                <TimelineIcon fontSize="small" />
-              </ToggleButton>
-            </Tooltip>
-          </ToggleButtonGroup>
+            Abbrechen
+          </Button>
         </Box>
+      )}
+
+      <Box sx={{ position: 'absolute', top: 10, right: 10, zIndex: 1000, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1, width: 'fit-content' }}>
 
         <Tooltip title={gpsActive ? 'GPS deaktivieren' : 'GPS aktivieren'} placement="left">
           <Box sx={{ bgcolor: 'background.paper', borderRadius: 1, boxShadow: 2 }}>
@@ -518,7 +578,7 @@ export default function VineyardMap({
                     selected={activeOverlays.includes(o.key)}
                     onChange={() => toggleOverlay(o.key)}
                     aria-label={o.label}
-                    sx={i < OVERLAYS.length - 1 ? { borderBottom: 1, borderColor: 'divider' } : undefined}
+                    sx={{ padding: '5px', ...(i < OVERLAYS.length - 1 ? { borderBottom: 1, borderColor: 'divider' } : {}) }}
                   >
                     {o.icon}
                   </ToggleButton>

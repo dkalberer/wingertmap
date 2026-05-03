@@ -166,9 +166,8 @@ type PruningRecord struct {
 type TaskStatus string
 
 const (
-	TaskStatusOpen       TaskStatus = "offen"
-	TaskStatusInProgress TaskStatus = "in_bearbeitung"
-	TaskStatusDone       TaskStatus = "erledigt"
+	TaskStatusOpen TaskStatus = "offen"
+	TaskStatusDone TaskStatus = "erledigt"
 )
 
 type RecordType string

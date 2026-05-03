@@ -29,7 +29,7 @@ describe('TaskCard', () => {
   it('calls onStatusChange when status button clicked', () => {
     const onStatusChange = vi.fn()
     render(<TaskCard task={mockTask} onStatusChange={onStatusChange} />)
-    fireEvent.click(screen.getByRole('button', { name: /in arbeit/i }))
-    expect(onStatusChange).toHaveBeenCalledWith('task-1', 'in_bearbeitung')
+    fireEvent.click(screen.getByRole('button', { name: /erledigt/i }))
+    expect(onStatusChange).toHaveBeenCalledWith('task-1', 'erledigt')
   })
 })

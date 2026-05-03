@@ -27,7 +27,7 @@ interface Props {
   onDelete: (id: string) => void
 }
 
-const STATUS_ORDER: TaskStatus[] = ['offen', 'in_bearbeitung', 'erledigt']
+const STATUS_ORDER: TaskStatus[] = ['offen', 'erledigt']
 
 export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onDelete }: Props) {
   const [photos, setPhotos] = useState<TaskPhoto[]>([])
@@ -91,10 +91,10 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
                 fontSize: '0.7rem',
                 fontWeight: 600,
                 '&.Mui-selected': {
-                  bgcolor: s === 'erledigt' ? 'success.main' : s === 'in_bearbeitung' ? 'warning.main' : 'primary.main',
+                  bgcolor: s === 'erledigt' ? 'success.main' : 'primary.main',
                   color: 'white',
                   '&:hover': {
-                    bgcolor: s === 'erledigt' ? 'success.dark' : s === 'in_bearbeitung' ? 'warning.dark' : 'primary.dark',
+                    bgcolor: s === 'erledigt' ? 'success.dark' : 'primary.dark',
                   },
                 },
               }}
@@ -108,11 +108,13 @@ export default function TaskDetail({ task, onBack, onStatusChange, onLocate, onD
 
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Box sx={{ display: 'flex', gap: 0.75, flexWrap: 'wrap' }}>
-            <Chip
-              label={CATEGORY_LABELS[task.category]}
-              size="small"
-              variant="outlined"
-            />
+            {task.recordType === 'beobachtung' && (
+              <Chip
+                label={CATEGORY_LABELS[task.category]}
+                size="small"
+                variant="outlined"
+              />
+            )}
             {task.severity && (
               <Chip
                 label={SEVERITY_LABELS[task.severity]}

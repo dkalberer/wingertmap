@@ -1,15 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
-  Box, Button, Divider, CircularProgress, Alert, Stack,
+  Box, CircularProgress, Alert, Button, Divider,
 } from '@mui/material'
-import AddLocationAltIcon from '@mui/icons-material/AddLocationAlt'
-import GpsFixedIcon from '@mui/icons-material/GpsFixed'
-import AddIcon from '@mui/icons-material/Add'
 import type { Task, GeoJSONPoint, TaskStatus } from '../../types'
 import type { CreateTaskParams } from '../../api/tasks'
 import TaskList from './TaskList'
 import TaskDetail from './TaskDetail'
 import CreateTaskDialog from './CreateTaskDialog'
+import { useNavigationStore } from '../../store/navigationStore'
+import { useMobile } from '../../hooks/useMobile'
 
 interface Props {
   tasks: Task[]
@@ -17,9 +16,9 @@ interface Props {
   error: string | null
   pendingLocation: GeoJSONPoint | null
   selectedTask: Task | null
+  fabTrigger?: number
   onStartPicking: () => void
   onCancelPicking: () => void
-  onGPSLocation: (p: GeoJSONPoint) => void
   onCreate: (params: CreateTaskParams) => Promise<Task>
   onStatusChange: (id: string, status: TaskStatus) => void
   onDelete: (id: string) => void
@@ -29,39 +28,38 @@ interface Props {
 
 export default function GlobalTasksPanel({
   tasks, loading, error,
-  pendingLocation, selectedTask,
-  onStartPicking, onCancelPicking, onGPSLocation,
+  pendingLocation, selectedTask, fabTrigger,
+  onStartPicking, onCancelPicking,
   onCreate, onStatusChange, onDelete, onLocate, onTaskSelect,
 }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [gpsLoading, setGpsLoading] = useState(false)
-  const [gpsError, setGpsError] = useState<string | null>(null)
+  const [subTab, setSubTab] = useState<0 | 1>(0)
+  const consumeFAB = useNavigationStore((s) => s.consumeFAB)
+  const isMobile = useMobile()
+  const prevFabTriggerRef = useRef<number | null>(null)
 
-  // When a location arrives (map pick or GPS), open the dialog automatically
   useEffect(() => {
     if (pendingLocation) setDialogOpen(true)
   }, [pendingLocation])
 
-  // Keep selectedTask in sync: if the task was updated (e.g. status change), reflect latest
+  useEffect(() => {
+    const cur = fabTrigger ?? 0
+    const prev = prevFabTriggerRef.current
+
+    if (prev === null) {
+      if (cur > 0) { setDialogOpen(true); consumeFAB() }
+    } else if (cur > prev) {
+      setDialogOpen(true); consumeFAB()
+    }
+
+    prevFabTriggerRef.current = cur
+  }, [fabTrigger, consumeFAB])
+
   const liveTask = selectedTask ? (tasks.find((t) => t.id === selectedTask.id) ?? selectedTask) : null
 
-  function handleStartPick() {
-    setGpsError(null)
-    onStartPicking()
-  }
-
-  function handleUseGPS() {
-    setGpsError(null)
-    setGpsLoading(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setGpsLoading(false)
-        onCancelPicking()
-        onGPSLocation({ type: 'Point', coordinates: [pos.coords.longitude, pos.coords.latitude] })
-      },
-      (err) => { setGpsLoading(false); setGpsError(err.message) },
-      { enableHighAccuracy: true, timeout: 10000 },
-    )
+  function handleDialogStartPicking() {
+    setDialogOpen(false)
+    setTimeout(() => onStartPicking(), 350)
   }
 
   async function handleSubmit(params: CreateTaskParams) {
@@ -76,11 +74,17 @@ export default function GlobalTasksPanel({
     onCancelPicking()
   }
 
+  function handleBack() {
+    // Return to the sub-tab matching the task's type
+    if (liveTask) setSubTab(liveTask.recordType === 'beobachtung' ? 1 : 0)
+    onTaskSelect(null)
+  }
+
   if (liveTask) {
     return (
       <TaskDetail
         task={liveTask}
-        onBack={() => onTaskSelect(null)}
+        onBack={handleBack}
         onStatusChange={onStatusChange}
         onLocate={onLocate}
         onDelete={(id) => { onDelete(id); onTaskSelect(null) }}
@@ -88,62 +92,56 @@ export default function GlobalTasksPanel({
     )
   }
 
+  const aufgaben = tasks.filter((t) => t.recordType !== 'beobachtung')
+  const beobachtungen = tasks.filter((t) => t.recordType === 'beobachtung')
+  const visibleTasks = subTab === 0 ? aufgaben : beobachtungen
+
   return (
-    <Box sx={{ p: 1.5 }}>
-      {error && <Alert severity="error" sx={{ mb: 1 }}>{error}</Alert>}
-
-      {loading ? (
-        <CircularProgress size={18} sx={{ display: 'block', mx: 'auto', my: 1 }} />
-      ) : (
-        <TaskList
-          tasks={tasks}
-          onStatusChange={onStatusChange}
-          onSelect={onTaskSelect}
-          onNew={() => setDialogOpen(true)}
-        />
-      )}
-
-      <Divider sx={{ my: 1.5 }} />
-
-      <Stack spacing={0.75}>
-        {/* role="alert" ensures screen readers announce GPS errors immediately */}
-        {gpsError && <Alert severity="warning" role="alert" sx={{ py: 0 }}>{gpsError}</Alert>}
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+      <Box sx={{ display: 'flex', px: 1.5, pt: isMobile ? 0.5 : 1.5, pb: 1, gap: 1, flexShrink: 0 }}>
         <Button
           size="small"
-          startIcon={<AddIcon />}
-          onClick={() => setDialogOpen(true)}
-          fullWidth
-          variant="contained"
-          sx={{ minHeight: 44 }}
+          variant={subTab === 0 ? 'contained' : 'outlined'}
+          onClick={() => setSubTab(0)}
+          sx={{ flex: 1, minHeight: 36 }}
         >
-          Neue Aufgabe
+          Tätigkeiten{aufgaben.filter((t) => t.status !== 'erledigt').length > 0
+            ? ` (${aufgaben.filter((t) => t.status !== 'erledigt').length})`
+            : ''}
         </Button>
         <Button
           size="small"
-          startIcon={<AddLocationAltIcon />}
-          onClick={handleStartPick}
-          fullWidth
-          variant="outlined"
-          sx={{ minHeight: 44 }}
+          variant={subTab === 1 ? 'contained' : 'outlined'}
+          onClick={() => setSubTab(1)}
+          sx={{ flex: 1, minHeight: 36 }}
         >
-          Standort auf Karte wählen
+          Beobachtungen{beobachtungen.filter((t) => t.status !== 'erledigt').length > 0
+            ? ` (${beobachtungen.filter((t) => t.status !== 'erledigt').length})`
+            : ''}
         </Button>
-        <Button
-          size="small"
-          startIcon={gpsLoading ? <CircularProgress size={14} /> : <GpsFixedIcon />}
-          onClick={handleUseGPS}
-          fullWidth
-          variant="outlined"
-          disabled={gpsLoading}
-          sx={{ minHeight: 44 }}
-        >
-          GPS-Position verwenden
-        </Button>
-      </Stack>
+      </Box>
+
+      <Divider sx={{ flexShrink: 0 }} />
+
+      {error && <Alert severity="error" sx={{ m: 1.5 }}>{error}</Alert>}
+
+      <Box sx={{ flex: 1, overflow: 'auto', minHeight: 0, p: 1.5 }}>
+        {loading ? (
+          <CircularProgress size={18} sx={{ display: 'block', mx: 'auto', my: 1 }} />
+        ) : (
+          <TaskList
+            tasks={visibleTasks}
+            emptyText={subTab === 0 ? 'Keine offenen Tätigkeiten.' : 'Keine Beobachtungen erfasst.'}
+            onStatusChange={onStatusChange}
+            onSelect={onTaskSelect}
+          />
+        )}
+      </Box>
 
       <CreateTaskDialog
         open={dialogOpen}
         pendingLocation={pendingLocation}
+        onStartPicking={handleDialogStartPicking}
         onSubmit={handleSubmit}
         onClose={handleClose}
       />

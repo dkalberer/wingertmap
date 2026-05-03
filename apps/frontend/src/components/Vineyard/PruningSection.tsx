@@ -1,14 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
-  Box, Typography, Button, IconButton, CircularProgress, Alert,
-  List, ListItem, ListItemText, Collapse, Popover,
+  Box, Typography, IconButton, CircularProgress, Alert,
+  List, ListItem, ListItemText, Popover, Button,
 } from '@mui/material'
-import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import { usePruningStore } from '../../store/pruningStore'
-import { useHarvestStore } from '../../store/harvestStore'
-import PruningForm from './PruningForm'
-import PruningCorrelationTable from './PruningCorrelationTable'
 import type { Vineyard } from '../../types'
 
 interface Props {
@@ -16,21 +12,13 @@ interface Props {
 }
 
 export default function PruningSection({ vineyard }: Props) {
-  const [showForm, setShowForm] = useState(false)
   const [deleteAnchor, setDeleteAnchor] = useState<{ el: HTMLElement; id: string } | null>(null)
 
-  const { records, loading, error, load, create, remove } = usePruningStore()
-  const { harvests, load: loadHarvests } = useHarvestStore()
+  const { records, loading, error, load, remove } = usePruningStore()
 
   useEffect(() => {
     load(vineyard.id)
-    loadHarvests(vineyard.id)
-  }, [vineyard.id, load, loadHarvests])
-
-  async function handleCreate(params: Parameters<typeof create>[1]) {
-    await create(vineyard.id, params)
-    setShowForm(false)
-  }
+  }, [vineyard.id, load])
 
   async function handleDelete() {
     if (!deleteAnchor) return
@@ -40,32 +28,15 @@ export default function PruningSection({ vineyard }: Props) {
 
   return (
     <Box>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-        <Typography variant="overline" color="text.secondary" sx={{ flexGrow: 1 }}>
-          Rebschnitt
-        </Typography>
-        {!showForm && (
-          <IconButton size="small" onClick={() => setShowForm(true)} aria-label="Rebschnitt hinzufügen">
-            <AddIcon fontSize="small" />
-          </IconButton>
-        )}
-      </Box>
+      <Typography variant="overline" color="text.secondary" component="p" sx={{ mb: 1 }}>
+        Rebschnitt
+      </Typography>
 
       {error && <Alert severity="error" sx={{ mb: 1, py: 0 }}>{error}</Alert>}
 
-      <Collapse in={showForm}>
-        <Box sx={{ mb: 2, p: 1.5, bgcolor: 'action.hover', borderRadius: 1 }}>
-          <PruningForm
-            vineyardId={vineyard.id}
-            onSubmit={handleCreate}
-            onCancel={() => setShowForm(false)}
-          />
-        </Box>
-      </Collapse>
-
       {loading ? (
         <CircularProgress size={20} />
-      ) : records.length === 0 && !showForm ? (
+      ) : records.length === 0 ? (
         <Typography variant="body2" color="text.disabled" sx={{ mb: 1 }}>
           Noch keine Schnittdaten erfasst.
         </Typography>
@@ -79,6 +50,7 @@ export default function PruningSection({ vineyard }: Props) {
                 <IconButton
                   size="small"
                   edge="end"
+                  color="error"
                   aria-label="Eintrag löschen"
                   onClick={(e) => setDeleteAnchor({ el: e.currentTarget, id: r.id })}
                 >
@@ -112,18 +84,12 @@ export default function PruningSection({ vineyard }: Props) {
             <Button size="small" variant="outlined" onClick={() => setDeleteAnchor(null)}>
               Abbrechen
             </Button>
-            <Button size="small" color="error" onClick={handleDelete}>
+            <Button size="small" color="error" variant="contained" onClick={handleDelete}>
               Löschen
             </Button>
           </Box>
         </Box>
       </Popover>
-
-      {(records.length > 0 || harvests.length > 0) && (
-        <Box sx={{ mt: 2 }}>
-          <PruningCorrelationTable records={records} harvests={harvests} />
-        </Box>
-      )}
     </Box>
   )
 }

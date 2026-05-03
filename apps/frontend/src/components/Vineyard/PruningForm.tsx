@@ -1,12 +1,6 @@
 import { useState, FormEvent } from 'react'
-import {
-  Box, TextField, Button, Alert,
-  ToggleButtonGroup, ToggleButton, Typography,
-} from '@mui/material'
-import type { SchnittTyp } from '../../types'
+import { Box, TextField, Button, Alert } from '@mui/material'
 import type { CreatePruningParams } from '../../api/pruning'
-
-const SCHNITT_TYPEN: SchnittTyp[] = ['Bogenschnitt', 'Zapfenschnitt', 'Minimalschnitt', 'Sonstiges']
 
 interface Props {
   vineyardId: string
@@ -18,7 +12,6 @@ export default function PruningForm({ vineyardId: _vineyardId, onSubmit, onCance
   const currentYear = new Date().getFullYear()
   const [year, setYear] = useState(String(currentYear))
   const [pruningDate, setPruningDate] = useState('')
-  const [schnittTyp, setSchnittTyp] = useState<SchnittTyp>('Bogenschnitt')
   const [augenProRebe, setAugenProRebe] = useState('')
   const [notes, setNotes] = useState('')
   const [loading, setLoading] = useState(false)
@@ -27,8 +20,8 @@ export default function PruningForm({ vineyardId: _vineyardId, onSubmit, onCance
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     const yearNum = parseInt(year)
-    if (!yearNum || !pruningDate || !schnittTyp) {
-      setError('Jahr, Datum und Schnitttyp sind Pflichtfelder')
+    if (!yearNum || !pruningDate) {
+      setError('Jahr und Datum sind Pflichtfelder')
       return
     }
     setLoading(true)
@@ -37,7 +30,7 @@ export default function PruningForm({ vineyardId: _vineyardId, onSubmit, onCance
       await onSubmit({
         year: yearNum,
         pruningDate,
-        schnittTyp,
+        schnittTyp: 'Bogenschnitt',
         augenProRebe: augenProRebe ? parseFloat(augenProRebe) : undefined,
         notes: notes || undefined,
       })
@@ -75,32 +68,13 @@ export default function PruningForm({ vineyardId: _vineyardId, onSubmit, onCance
         />
       </Box>
 
-      <Box>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-          Schnitttyp
-        </Typography>
-        <ToggleButtonGroup
-          value={schnittTyp}
-          exclusive
-          onChange={(_, v) => { if (v) setSchnittTyp(v) }}
-          size="small"
-          sx={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', width: '100%' }}
-        >
-          {SCHNITT_TYPEN.map((typ) => (
-            <ToggleButton key={typ} value={typ} sx={{ minHeight: 44, fontSize: '0.75rem' }}>
-              {typ}
-            </ToggleButton>
-          ))}
-        </ToggleButtonGroup>
-      </Box>
-
       <TextField
         label="Augen / Rebe"
         type="number"
         value={augenProRebe}
         onChange={(e) => setAugenProRebe(e.target.value)}
         size="small"
-        slotProps={{ input: { inputProps: { min: 0, max: 99, step: 0.5 } } }}
+        slotProps={{ input: { inputProps: { min: 0, max: 99, step: 0.5, inputMode: 'decimal' } } }}
         helperText="Durchschnittlich belassene Augen pro Rebe"
       />
 

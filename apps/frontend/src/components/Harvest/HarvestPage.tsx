@@ -7,7 +7,6 @@ import type { Vineyard } from '../../types'
 import { useHarvestStore } from '../../store/harvestStore'
 import HarvestForm from './HarvestForm'
 import HarvestList from './HarvestList'
-import HarvestCharts from './HarvestCharts'
 
 interface Props {
   vineyard: Vineyard | null
@@ -78,13 +77,6 @@ export default function HarvestPage({ vineyard }: Props) {
             </Box>
           )}
 
-          {harvests.length > 1 && (
-            <>
-              <Divider />
-              <HarvestCharts harvests={harvests} />
-              <Box sx={{ pb: 2 }} />
-            </>
-          )}
         </>
       )}
     </Box>

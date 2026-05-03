@@ -83,7 +83,7 @@ export default function HarvestForm({ vineyardId: _vineyardId, onSubmit, onCance
           onChange={(e) => setWeightKg(e.target.value)}
           size="small"
           required
-          slotProps={{ input: { inputProps: { min: 0, step: 0.1 } } }}
+          slotProps={{ input: { inputProps: { min: 0, step: 0.1, inputMode: 'decimal' } } }}
           sx={{ flex: 1 }}
         />
         <TextField
@@ -92,7 +92,7 @@ export default function HarvestForm({ vineyardId: _vineyardId, onSubmit, onCance
           value={oechsle}
           onChange={(e) => setOechsle(e.target.value)}
           size="small"
-          slotProps={{ input: { inputProps: { min: 0 } } }}
+          slotProps={{ input: { inputProps: { min: 0, inputMode: 'numeric' } } }}
           sx={{ flex: 1 }}
         />
       </Box>

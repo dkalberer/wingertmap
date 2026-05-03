@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import {
   Box, Button, Chip, Divider, IconButton, List, ListItem, ListItemText,
-  MenuItem, Select, TextField, Typography, Alert,
+  MenuItem, Popover, Select, TextField, Typography, Alert,
 } from '@mui/material'
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
@@ -10,14 +10,18 @@ import UploadIcon from '@mui/icons-material/Upload'
 import type { Vineyard } from '../../types'
 import { usePersonalStore } from '../../store/personalStore'
 import { exportTimeEntries, importTimeEntries, type ImportResult } from '../../api/timeEntries'
+import { useMobile } from '../../hooks/useMobile'
 
 const MONTHS = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez']
 
 interface Props {
   vineyard: Vineyard | null
+  readOnly?: boolean
 }
 
-export default function TimeEntrySection({ vineyard }: Props) {
+export default function TimeEntrySection({ vineyard, readOnly = false }: Props) {
+  const isMobile = useMobile()
+  const inputSize = isMobile ? 'medium' : 'small'
   const { employees, workTypes, entries, year, setYear, createEntry, removeEntry } = usePersonalStore()
   const [showForm, setShowForm] = useState(false)
   const [employeeIds, setEmployeeIds] = useState<string[]>([])
@@ -28,6 +32,7 @@ export default function TimeEntrySection({ vineyard }: Props) {
   const [saving, setSaving] = useState(false)
   const [importResult, setImportResult] = useState<ImportResult | null>(null)
   const [importError, setImportError] = useState('')
+  const [deleteAnchor, setDeleteAnchor] = useState<{ el: HTMLElement; id: string } | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   async function handleExport() {
@@ -120,7 +125,12 @@ export default function TimeEntrySection({ vineyard }: Props) {
           <ListItem
             key={entry.id}
             secondaryAction={
-              <IconButton edge="end" size="small" onClick={() => removeEntry(entry.id)}>
+              <IconButton
+                edge="end"
+                size="small"
+                color="error"
+                onClick={(e) => setDeleteAnchor({ el: e.currentTarget, id: entry.id })}
+              >
                 <DeleteIcon fontSize="small" />
               </IconButton>
             }
@@ -154,9 +164,9 @@ export default function TimeEntrySection({ vineyard }: Props) {
         )}
       </List>
 
-      <Divider />
+      {!readOnly && <Divider />}
 
-      {showForm ? (
+      {!readOnly && (showForm ? (
         <Box sx={{ px: 2, py: 1.5, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
           <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
             {employees.map((e) => {
@@ -175,7 +185,7 @@ export default function TimeEntrySection({ vineyard }: Props) {
           </Box>
 
           <Select
-            size="small"
+            size={inputSize}
             displayEmpty
             value={workTypeId}
             onChange={(e) => setWorkTypeId(e.target.value)}
@@ -187,25 +197,25 @@ export default function TimeEntrySection({ vineyard }: Props) {
 
           <Box sx={{ display: 'flex', gap: 1 }}>
             <TextField
-              size="small"
+              size={inputSize}
               type="date"
               value={entryDate}
               onChange={(e) => setEntryDate(e.target.value)}
               sx={{ flex: 2 }}
             />
             <TextField
-              size="small"
+              size={inputSize}
               type="number"
               label="Stunden"
               value={hours}
               onChange={(e) => setHours(e.target.value)}
-              slotProps={{ htmlInput: { min: 0.5, step: 0.5 } }}
+              slotProps={{ htmlInput: { min: 0.5, step: 0.5, inputMode: 'decimal' } }}
               sx={{ flex: 1 }}
             />
           </Box>
 
           <TextField
-            size="small"
+            size={inputSize}
             label="Notiz (optional)"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
@@ -230,7 +240,35 @@ export default function TimeEntrySection({ vineyard }: Props) {
             Stunden erfassen
           </Button>
         </Box>
-      )}
+      ))}
+
+      <Popover
+        open={!!deleteAnchor}
+        anchorEl={deleteAnchor?.el}
+        onClose={() => setDeleteAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Typography variant="body2">Eintrag löschen?</Typography>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              size="small" color="error" variant="contained"
+              onClick={() => { if (deleteAnchor) { removeEntry(deleteAnchor.id); setDeleteAnchor(null) } }}
+              sx={{ minHeight: 44, flex: 1 }}
+            >
+              Löschen
+            </Button>
+            <Button
+              size="small" variant="outlined"
+              onClick={() => setDeleteAnchor(null)}
+              sx={{ minHeight: 44, flex: 1 }}
+            >
+              Abbrechen
+            </Button>
+          </Box>
+        </Box>
+      </Popover>
     </Box>
   )
 }

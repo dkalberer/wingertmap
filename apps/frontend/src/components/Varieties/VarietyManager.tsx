@@ -11,13 +11,11 @@ import type { GrapeColor } from '../../types'
 const COLOR_LABELS: Record<GrapeColor, string> = {
   weiss: 'Weiss',
   rot:   'Rot',
-  rose:  'Rosé',
 }
 
 const COLOR_DOT: Record<GrapeColor, string> = {
   weiss: '#f5f0e0',
   rot:   '#8b1a1a',
-  rose:  '#e8a0a0',
 }
 
 export default function VarietyManager() {

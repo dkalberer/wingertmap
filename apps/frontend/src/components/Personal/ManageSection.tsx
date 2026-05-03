@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Box, Typography, IconButton, List, ListItem, ListItemText,
-  TextField, Button, Divider,
+  TextField, Button, Divider, Popover, Alert,
 } from '@mui/material'
 import DeleteIcon from '@mui/icons-material/Delete'
 import AddIcon from '@mui/icons-material/Add'
@@ -9,10 +9,15 @@ import { usePersonalStore } from '../../store/personalStore'
 
 const SEED_WORK_TYPES = ['Rebschnitt', 'Erlesen', 'Lauben', 'Sonstiges']
 
-export default function ManageSection() {
+interface Props {
+  section?: 'employees' | 'workTypes'
+}
+
+export default function ManageSection({ section }: Props) {
   const { employees, workTypes, createEmployee, removeEmployee, createWorkType, removeWorkType } = usePersonalStore()
   const [newEmployee, setNewEmployee] = useState('')
   const [newWorkType, setNewWorkType] = useState('')
+  const [deleteAnchor, setDeleteAnchor] = useState<{ el: HTMLElement; id: string; type: 'employee' | 'worktype' } | null>(null)
 
   async function handleAddEmployee() {
     const name = newEmployee.trim()
@@ -28,81 +33,147 @@ export default function ManageSection() {
     setNewWorkType('')
   }
 
+  async function handleDelete() {
+    if (!deleteAnchor) return
+    if (deleteAnchor.type === 'employee') await removeEmployee(deleteAnchor.id)
+    else await removeWorkType(deleteAnchor.id)
+    setDeleteAnchor(null)
+  }
+
+  const showEmployees = !section || section === 'employees'
+  const showWorkTypes = !section || section === 'workTypes'
+
   return (
-    <Box sx={{ px: 2, py: 1.5 }}>
-      {/* Mitarbeiter */}
-      <Typography variant="overline" color="text.secondary">Mitarbeiter</Typography>
-      <List dense disablePadding sx={{ maxHeight: 160, overflow: 'auto' }}>
-        {employees.map((e) => (
-          <ListItem
-            key={e.id}
-            disableGutters
-            secondaryAction={
-              <IconButton edge="end" size="small" onClick={() => removeEmployee(e.id)}>
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            }
+    <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+
+      {showEmployees && (
+        <>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Mitarbeiter</Typography>
+
+          {employees.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">Noch keine Mitarbeiter erfasst.</Typography>
+          ) : (
+            <List dense disablePadding>
+              {employees.map((e, i) => (
+                <Box key={e.id}>
+                  {i > 0 && <Divider />}
+                  <ListItem
+                    disableGutters
+                    secondaryAction={
+                      <IconButton
+                        size="small"
+                        onClick={(ev) => setDeleteAnchor({ el: ev.currentTarget, id: e.id, type: 'employee' })}
+                        sx={{ color: 'error.main', minWidth: 44, minHeight: 44 }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemText primary={<Typography variant="body2">{e.name}</Typography>} />
+                  </ListItem>
+                </Box>
+              ))}
+            </List>
+          )}
+
+          <Box component="form" onSubmit={(ev) => { ev.preventDefault(); handleAddEmployee() }}
+            sx={{ display: 'flex', gap: 1 }}
           >
-            <ListItemText primary={e.name} />
-          </ListItem>
-        ))}
-      </List>
-      <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-        <TextField
-          size="small"
-          placeholder="Name"
-          value={newEmployee}
-          onChange={(e) => setNewEmployee(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleAddEmployee()}
-          sx={{ flex: 1 }}
-        />
-        <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={handleAddEmployee}>
-          Hinzufügen
-        </Button>
-      </Box>
-
-      <Divider sx={{ my: 2 }} />
-
-      {/* Tätigkeitstypen */}
-      <Typography variant="overline" color="text.secondary">Tätigkeitstypen</Typography>
-      {workTypes.length === 0 && (
-        <Box sx={{ mt: 0.5, mb: 1 }}>
-          <Typography variant="caption" color="text.secondary">Vorschläge: </Typography>
-          {SEED_WORK_TYPES.map((name) => (
-            <Button key={name} size="small" variant="text" sx={{ mr: 0.5, fontSize: '0.75rem' }} onClick={() => handleAddWorkType(name)}>
-              + {name}
+            <TextField
+              size="small"
+              placeholder="Name"
+              value={newEmployee}
+              onChange={(e) => setNewEmployee(e.target.value)}
+              sx={{ flex: 1 }}
+            />
+            <Button size="small" variant="outlined" startIcon={<AddIcon />} type="submit" sx={{ minHeight: 40 }}>
+              Hinzufügen
             </Button>
-          ))}
-        </Box>
+          </Box>
+        </>
       )}
-      <List dense disablePadding sx={{ maxHeight: 200, overflow: 'auto' }}>
-        {workTypes.map((wt) => (
-          <ListItem
-            key={wt.id}
-            disableGutters
-            secondaryAction={
-              <IconButton edge="end" size="small" onClick={() => removeWorkType(wt.id)}>
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            }
+
+      {showEmployees && showWorkTypes && <Divider />}
+
+      {showWorkTypes && (
+        <>
+          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Tätigkeiten</Typography>
+
+          {workTypes.length === 0 && (
+            <Box>
+              <Typography variant="caption" color="text.secondary">Vorschläge: </Typography>
+              {SEED_WORK_TYPES.map((name) => (
+                <Button key={name} size="small" variant="text" sx={{ mr: 0.5, fontSize: '0.75rem' }} onClick={() => handleAddWorkType(name)}>
+                  + {name}
+                </Button>
+              ))}
+            </Box>
+          )}
+
+          {workTypes.length > 0 && (
+            <List dense disablePadding>
+              {workTypes.map((wt, i) => (
+                <Box key={wt.id}>
+                  {i > 0 && <Divider />}
+                  <ListItem
+                    disableGutters
+                    secondaryAction={
+                      <IconButton
+                        size="small"
+                        onClick={(ev) => setDeleteAnchor({ el: ev.currentTarget, id: wt.id, type: 'worktype' })}
+                        sx={{ color: 'error.main', minWidth: 44, minHeight: 44 }}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    }
+                  >
+                    <ListItemText primary={<Typography variant="body2">{wt.name}</Typography>} />
+                  </ListItem>
+                </Box>
+              ))}
+            </List>
+          )}
+
+          <Box component="form" onSubmit={(ev) => { ev.preventDefault(); handleAddWorkType(newWorkType) }}
+            sx={{ display: 'flex', gap: 1 }}
           >
-            <ListItemText primary={wt.name} />
-          </ListItem>
-        ))}
-      </List>
-      <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-        <TextField
-          size="small"
-          placeholder="z.B. Pikieren"
-          value={newWorkType}
-          onChange={(e) => setNewWorkType(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleAddWorkType(newWorkType)}
-          sx={{ flex: 1 }}
-        />
-        <Button size="small" variant="outlined" startIcon={<AddIcon />} onClick={() => handleAddWorkType(newWorkType)}>
-          Hinzufügen
-        </Button>
-      </Box>
+            <TextField
+              size="small"
+              placeholder="z.B. Pikieren"
+              value={newWorkType}
+              onChange={(e) => setNewWorkType(e.target.value)}
+              sx={{ flex: 1 }}
+            />
+            <Button size="small" variant="outlined" startIcon={<AddIcon />} type="submit" sx={{ minHeight: 40 }}>
+              Hinzufügen
+            </Button>
+          </Box>
+        </>
+      )}
+
+      {/* Shared delete confirmation popover */}
+      <Popover
+        open={!!deleteAnchor}
+        anchorEl={deleteAnchor?.el}
+        onClose={() => setDeleteAnchor(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+        transformOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Box sx={{ p: 1.5, display: 'flex', flexDirection: 'column', gap: 1 }}>
+          <Alert severity="warning" sx={{ py: 0 }}>
+            {deleteAnchor?.type === 'employee' ? 'Mitarbeiter löschen?' : 'Tätigkeit löschen?'}
+          </Alert>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button size="small" color="error" variant="contained" onClick={handleDelete} sx={{ minHeight: 44, flex: 1 }}>
+              Löschen
+            </Button>
+            <Button size="small" variant="outlined" onClick={() => setDeleteAnchor(null)} sx={{ minHeight: 44, flex: 1 }}>
+              Abbrechen
+            </Button>
+          </Box>
+        </Box>
+      </Popover>
+
     </Box>
   )
 }

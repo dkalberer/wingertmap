@@ -3,7 +3,7 @@ import { Box, CircularProgress, Alert } from '@mui/material'
 import { usePersonalStore } from '../../store/personalStore'
 import ManageSection from './ManageSection'
 
-export default function PersonalPage() {
+export default function WorkTypesPage() {
   const { loading, error, loadAll } = usePersonalStore()
 
   useEffect(() => { loadAll() }, [loadAll])
@@ -13,7 +13,7 @@ export default function PersonalPage() {
 
   return (
     <Box sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
-      <ManageSection section="employees" />
+      <ManageSection section="workTypes" />
     </Box>
   )
 }

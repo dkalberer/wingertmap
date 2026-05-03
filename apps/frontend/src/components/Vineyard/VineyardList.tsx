@@ -95,6 +95,7 @@ export default function VineyardList({ onSelect }: Props) {
                   <IconButton
                     edge="end"
                     size="small"
+                    color="error"
                     onClick={(e) => { e.stopPropagation(); setToDelete(v) }}
                     aria-label={`${v.name} löschen`}
                     title="Wingert löschen"

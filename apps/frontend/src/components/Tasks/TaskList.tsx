@@ -7,6 +7,7 @@ import TaskRow from './TaskRow'
 
 interface Props {
   tasks: Task[]
+  emptyText?: string
   onStatusChange: (id: string, status: TaskStatus) => void
   onSelect: (task: Task) => void
   onNew?: () => void
@@ -123,39 +124,14 @@ function CollapsibleGroup({ group }: { group: Group & { onStatusChange: Props['o
   )
 }
 
-export default function TaskList({ tasks, onStatusChange, onSelect, onNew }: Props) {
+export default function TaskList({ tasks, emptyText, onStatusChange, onSelect }: Props) {
   if (tasks.length === 0) {
     return (
       <Box sx={{ py: 4, textAlign: 'center', px: 2 }}>
         <Typography sx={{ fontSize: 36, mb: 1 }} aria-hidden="true">✓</Typography>
-        <Typography variant="body2" sx={{ fontWeight: 600, mb: 0.5 }}>Keine offenen Aufgaben</Typography>
-        <Typography variant="caption" color="text.secondary" component="p" sx={{ mb: 2 }}>
-          Neue Aufgabe erstellen oder Standort auf der Karte wählen.
+        <Typography variant="caption" color="text.secondary" component="p">
+          {emptyText ?? 'Über den Quick-Add erfassen.'}
         </Typography>
-        {onNew && (
-          <Box
-            component="button"
-            onClick={onNew}
-            sx={{
-              all: 'unset',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 0.5,
-              px: 2,
-              py: 1,
-              bgcolor: 'primary.main',
-              color: 'primary.contrastText',
-              borderRadius: 2,
-              fontSize: '0.8125rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              '&:hover': { bgcolor: 'primary.dark' },
-              '&:focus-visible': { outline: '2px solid', outlineColor: 'primary.main', outlineOffset: 2 },
-            }}
-          >
-            + Neue Aufgabe
-          </Box>
-        )}
       </Box>
     )
   }

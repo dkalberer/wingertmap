@@ -4,7 +4,6 @@ import WeatherWidget from './WeatherWidget'
 import ProtectionBadge from './ProtectionBadge'
 import SprayHistorySection from './SprayHistorySection'
 import JournalSection from './JournalSection'
-import PruningSection from './PruningSection'
 
 interface Props {
   vineyard: Vineyard
@@ -38,10 +37,6 @@ export default function VineyardDetail({ vineyard }: Props) {
       <Divider sx={{ my: 2 }} />
 
       <JournalSection vineyardId={vineyard.id} />
-
-      <Divider sx={{ my: 2 }} />
-
-      <PruningSection vineyard={vineyard} />
     </Box>
   )
 }
