@@ -29,9 +29,9 @@ describe('VineyardMap', () => {
     expect(screen.getByTestId('vineyard-map')).toBeInTheDocument()
   })
 
-  it('renders drawing tool buttons', () => {
+  it('renders map controls', () => {
     render(<VineyardMap />)
-    expect(screen.getByRole('button', { name: /wingert zeichnen/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /reihe zeichnen/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /gps/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /kartenebene/i })).toBeInTheDocument()
   })
 })
