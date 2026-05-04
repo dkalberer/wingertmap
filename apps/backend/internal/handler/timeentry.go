@@ -33,7 +33,7 @@ func (h *TimeEntryHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	list, err := h.repo.ListByUser(userID, year)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -86,7 +86,7 @@ func (h *TimeEntryHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	entry, err := h.repo.Create(params)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, entry)
@@ -101,7 +101,7 @@ func (h *TimeEntryHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.Delete(id, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -120,7 +120,7 @@ func (h *TimeEntryHandler) Export(w http.ResponseWriter, r *http.Request) {
 
 	entries, err := h.repo.ListByUser(userID, year)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 
@@ -197,7 +197,7 @@ func (h *TimeEntryHandler) Import(w http.ResponseWriter, r *http.Request) {
 
 	result, err := h.repo.Import(rows, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, result)
@@ -216,7 +216,7 @@ func (h *TimeEntryHandler) Stats(w http.ResponseWriter, r *http.Request) {
 
 	stats, err := h.repo.StatsByYear(userID, year)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, stats)

@@ -25,7 +25,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 	token, user, err := h.svc.Login(req.Email, req.Password)
 	if err != nil {
-		writeError(w, http.StatusUnauthorized, err.Error())
+		writeError(w, http.StatusUnauthorized, "invalid credentials")
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"token": token, "user": user})

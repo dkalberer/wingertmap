@@ -22,7 +22,7 @@ func (h *TaskHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	tasks, err := h.repo.ListByVine(vineID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, tasks)
@@ -86,7 +86,7 @@ func (h *TaskHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	task, err := h.repo.Create(p)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, task)
@@ -107,7 +107,7 @@ func (h *TaskHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 	}
 	task, err := h.repo.UpdateStatus(id, req.Status)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, task)
@@ -120,7 +120,7 @@ func (h *TaskHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.Delete(id); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -131,7 +131,7 @@ func (h *TaskHandler) All(w http.ResponseWriter, r *http.Request) {
 	userID, _ := uuid.Parse(claims.UserID)
 	tasks, err := h.repo.ListByCreator(userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, tasks)

@@ -96,7 +96,7 @@ func (h *WeatherHandler) PlantProtectionStatus(w http.ResponseWriter, r *http.Re
 
 	task, err := h.tasks.LatestSprayTask(id)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 

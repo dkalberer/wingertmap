@@ -29,7 +29,7 @@ func LoadConfig() (*Config, error) {
 		DBName:     env("DB_NAME", "postgres"),
 		DBUser:     env("DB_USER", "postgres"),
 		DBPassword: os.Getenv("DB_PASSWORD"),
-		DBSSLMode:  env("DB_SSLMODE", "disable"),
+		DBSSLMode:  env("DB_SSLMODE", "require"),
 		DBSchema:   env("DB_SCHEMA", "wingert"),
 		JWTSecret:  os.Getenv("JWT_SECRET"),
 		Port:       env("PORT", "8080"),

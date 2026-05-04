@@ -21,7 +21,7 @@ func (h *VineyardHandler) List(w http.ResponseWriter, r *http.Request) {
 	ownerID, _ := uuid.Parse(claims.UserID)
 	list, err := h.repo.ListByOwner(ownerID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -41,7 +41,7 @@ func (h *VineyardHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	v, err := h.repo.Create(req.Name, req.Description, req.Boundary, ownerID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, v)
@@ -77,7 +77,7 @@ func (h *VineyardHandler) Update(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.Update(id, req.Name, req.Description, req.Boundary); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	v, _ := h.repo.GetByID(id)
@@ -91,7 +91,7 @@ func (h *VineyardHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.Delete(id); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

@@ -60,13 +60,13 @@ func (h *PhotoHandler) Upload(w http.ResponseWriter, r *http.Request) {
 		minio.PutObjectOptions{ContentType: header.Header.Get("Content-Type")},
 	)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "upload failed: "+err.Error())
+		writeInternalError(w, err)
 		return
 	}
 
 	row := photoRow{ID: uuid.New(), TaskID: taskID, ObjectKey: objectKey}
 	if err := h.db.Create(&row).Error; err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 
@@ -86,7 +86,7 @@ func (h *PhotoHandler) List(w http.ResponseWriter, r *http.Request) {
 
 	var rows []photoRow
 	if err := h.db.Where("task_id = ?", taskID).Order("created_at asc").Find(&rows).Error; err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 
@@ -124,14 +124,14 @@ func (h *PhotoHandler) Content(w http.ResponseWriter, r *http.Request) {
 
 	obj, err := h.minio.GetObject(context.Background(), h.bucket, row.ObjectKey, minio.GetObjectOptions{})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	defer obj.Close()
 
 	info, err := obj.Stat()
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 

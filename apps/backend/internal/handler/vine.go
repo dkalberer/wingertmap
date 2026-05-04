@@ -22,7 +22,7 @@ func (h *VineHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	vines, err := h.repo.ListByRow(rowID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, vines)
@@ -45,7 +45,7 @@ func (h *VineHandler) Create(w http.ResponseWriter, r *http.Request) {
 	}
 	vine, err := h.repo.Create(rowID, req.VineNumber, req.Position, req.Notes)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, vine)
@@ -61,7 +61,7 @@ func (h *VineHandler) Nearby(w http.ResponseWriter, r *http.Request) {
 	}
 	vines, err := h.repo.FindNearby(lat, lng, radius)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, vines)

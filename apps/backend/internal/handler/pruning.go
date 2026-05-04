@@ -24,7 +24,7 @@ func (h *PruningHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	list, err := h.repo.ListByVineyard(vineyardID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -66,7 +66,7 @@ func (h *PruningHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:    createdBy,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, record)
@@ -103,7 +103,7 @@ func (h *PruningHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Notes:        req.Notes,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, record)
@@ -116,7 +116,7 @@ func (h *PruningHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.Delete(id); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

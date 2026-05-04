@@ -24,7 +24,7 @@ func (h *HarvestHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	list, err := h.repo.ListByVineyard(vineyardID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -72,7 +72,7 @@ func (h *HarvestHandler) Create(w http.ResponseWriter, r *http.Request) {
 		CreatedBy:   createdBy,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, entry)
@@ -111,7 +111,7 @@ func (h *HarvestHandler) Update(w http.ResponseWriter, r *http.Request) {
 		Notes:       req.Notes,
 	})
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, entry)
@@ -124,7 +124,7 @@ func (h *HarvestHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.Delete(id); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

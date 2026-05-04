@@ -21,7 +21,7 @@ func (h *GrapeVarietyHandler) List(w http.ResponseWriter, r *http.Request) {
 	userID, _ := uuid.Parse(claims.UserID)
 	list, err := h.repo.ListByUser(userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -49,7 +49,7 @@ func (h *GrapeVarietyHandler) Create(w http.ResponseWriter, r *http.Request) {
 
 	v, err := h.repo.Create(req.Name, req.Color, userID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, v)
@@ -65,7 +65,7 @@ func (h *GrapeVarietyHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.Delete(id, userID); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

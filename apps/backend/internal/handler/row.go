@@ -21,7 +21,7 @@ func (h *RowHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := h.repo.ListByVineyard(vineyardID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, rows)
@@ -46,13 +46,13 @@ func (h *RowHandler) Create(w http.ResponseWriter, r *http.Request) {
 	if rowNum == 0 {
 		rowNum, err = h.repo.NextRowNumber(vineyardID)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, err.Error())
+			writeInternalError(w, err)
 			return
 		}
 	}
 	row, err := h.repo.Create(vineyardID, rowNum, req.Line, req.Variety, domain.RowStatusConfirmed)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, row)
@@ -76,7 +76,7 @@ func (h *RowHandler) UpdateStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.UpdateStatus(id, req.Status); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -96,7 +96,7 @@ func (h *RowHandler) UpdateLine(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.UpdateLine(id, req.Line); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -110,13 +110,13 @@ func (h *RowHandler) ConfirmAll(w http.ResponseWriter, r *http.Request) {
 	}
 	rows, err := h.repo.ListByVineyard(vineyardID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	for _, row := range rows {
 		if row.Status == domain.RowStatusProposed {
 			if err := h.repo.UpdateStatus(row.ID, domain.RowStatusConfirmed); err != nil {
-				writeError(w, http.StatusInternalServerError, err.Error())
+				writeInternalError(w, err)
 				return
 			}
 		}
@@ -131,7 +131,7 @@ func (h *RowHandler) Delete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.repo.Delete(id); err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

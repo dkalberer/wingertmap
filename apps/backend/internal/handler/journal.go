@@ -25,7 +25,7 @@ func (h *JournalHandler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	list, err := h.repo.ListByVineyard(vineyardID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, list)
@@ -44,7 +44,7 @@ func (h *JournalHandler) GetByYear(w http.ResponseWriter, r *http.Request) {
 	}
 	j, err := h.repo.GetByYear(vineyardID, year)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	if j == nil {
@@ -79,7 +79,7 @@ func (h *JournalHandler) Upsert(w http.ResponseWriter, r *http.Request) {
 
 	j, err := h.repo.Upsert(vineyardID, year, req.Notes, createdBy)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, err.Error())
+		writeInternalError(w, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, j)
