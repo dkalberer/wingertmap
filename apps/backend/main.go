@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	"github.com/go-chi/httprate"
 	"wingert/backend/internal/agrometeo"
 	"wingert/backend/internal/handler"
 	hmw "wingert/backend/internal/handler/middleware"
@@ -103,7 +104,7 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 
-	r.Post("/api/auth/login", authH.Login)
+	r.With(httprate.LimitByIP(10, time.Minute)).Post("/api/auth/login", authH.Login)
 
 	r.Group(func(r chi.Router) {
 		r.Use(jwtMW)
