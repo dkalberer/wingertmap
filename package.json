@@ -6,11 +6,5 @@
     "build": "pnpm --filter frontend build",
     "lint": "pnpm -r lint",
     "test": "pnpm -r test"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "msw"
-    ]
   }
 }
