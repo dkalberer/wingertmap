@@ -1,7 +1,7 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
-RUN corepack enable && corepack prepare pnpm@10.33.0 --activate
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc ./
+RUN corepack enable && corepack prepare pnpm@11.1.0 --activate
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY apps/frontend/package.json ./apps/frontend/
 RUN pnpm install --no-frozen-lockfile --filter frontend
 COPY apps/frontend/src ./apps/frontend/src
