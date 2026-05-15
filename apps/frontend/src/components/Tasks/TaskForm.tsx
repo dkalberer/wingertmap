@@ -7,7 +7,8 @@ import {
 import { useMobile } from '../../hooks/useMobile'
 import AddPhotoAlternateIcon from '@mui/icons-material/AddPhotoAlternate'
 import CloseIcon from '@mui/icons-material/Close'
-import type { GeoJSONPoint, Task, RecordType, TaskCategory, Severity } from '../../types'
+import type { GeoJSONPoint, Task, RecordType, TaskCategory, Severity, TaskSubtype, SprayPayload } from '../../types'
+import SprayFields from './SprayFields'
 import { SEVERITY_LABELS, PHASE_OPTIONS, PHASE_GROUPS, CATEGORY_LABELS } from '../../utils/taskLabels'
 import { uploadPhoto } from '../../api/photos'
 import { usePersonalStore } from '../../store/personalStore'
@@ -17,6 +18,7 @@ type BeobachtungType = 'phaenologie' | 'pflanzenschutz'
 interface Props {
   location?: GeoJSONPoint
   vineyardId?: string
+  mode?: 'pflanzenschutz'
   onSubmit: (params: {
     title: string
     recordType: RecordType
@@ -27,11 +29,19 @@ interface Props {
     dueDate?: string
     location?: GeoJSONPoint
     vineyardId?: string
+    subtype?: TaskSubtype
+    spray?: SprayPayload
   }) => Promise<Task>
   onCancel: () => void
 }
 
-export default function TaskForm({ location, vineyardId, onSubmit, onCancel }: Props) {
+const SUBTYPE_TITLES: Record<TaskSubtype, string> = {
+  'spritzung': 'Spritzung',
+  'dispenser-haengen': 'Dispenser aufhängen',
+  'maehen': 'Mähen',
+}
+
+export default function TaskForm({ location, vineyardId, mode, onSubmit, onCancel }: Props) {
   const isMobile = useMobile()
   const inputSize = isMobile ? 'medium' : 'small'
   const { workTypes, loading: workTypesLoading, loadAll } = usePersonalStore()
@@ -49,6 +59,8 @@ export default function TaskForm({ location, vineyardId, onSubmit, onCancel }: P
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [subtype, setSubtype] = useState<TaskSubtype | ''>('')
+  const [spray, setSpray] = useState<SprayPayload>({ productIds: [], substanceIds: [] })
   const fileRef = useRef<HTMLInputElement>(null)
 
   function handleFilePick(e: React.ChangeEvent<HTMLInputElement>) {
@@ -67,11 +79,15 @@ export default function TaskForm({ location, vineyardId, onSubmit, onCancel }: P
     let title: string
     let category: TaskCategory
 
-    if (recordType === 'aufgabe') {
+    if (mode === 'pflanzenschutz') {
+      if (!subtype) { setError('Bitte Massnahmen-Typ wählen'); return }
+      title = SUBTYPE_TITLES[subtype]
+      category = 'pflanzenschutz'
+    } else if (recordType === 'aufgabe') {
       const wt = workTypes.find((w) => w.id === selectedWorkTypeId)
       if (!wt) { setError('Bitte eine Tätigkeit auswählen'); return }
       title = wt.name
-      category = 'sonstiges'
+      category = wt.name.toLowerCase().includes('pflanzenschutz') ? 'pflanzenschutz' : 'sonstiges'
     } else {
       title = CATEGORY_LABELS[beobachtungType] ?? beobachtungType
       category = beobachtungType
@@ -81,14 +97,16 @@ export default function TaskForm({ location, vineyardId, onSubmit, onCancel }: P
     try {
       const task = await onSubmit({
         title,
-        recordType,
+        recordType: mode === 'pflanzenschutz' ? 'aufgabe' : recordType,
         category,
-        severity: recordType === 'beobachtung' && beobachtungType === 'pflanzenschutz' && severity ? severity : undefined,
-        phase: recordType === 'beobachtung' && beobachtungType === 'phaenologie' && phase ? phase : undefined,
+        severity: mode !== 'pflanzenschutz' && recordType === 'beobachtung' && beobachtungType === 'pflanzenschutz' && severity ? severity : undefined,
+        phase: mode !== 'pflanzenschutz' && recordType === 'beobachtung' && beobachtungType === 'phaenologie' && phase ? phase : undefined,
         notes: notes || undefined,
-        dueDate: recordType === 'beobachtung' ? observationDate : (dueDate || undefined),
+        dueDate: mode === 'pflanzenschutz' ? observationDate : recordType === 'beobachtung' ? observationDate : (dueDate || undefined),
         location,
         vineyardId,
+        subtype: subtype || undefined,
+        spray: subtype === 'spritzung' ? spray : undefined,
       })
       await Promise.all(pendingFiles.map((f) => uploadPhoto(task.id, f)))
     } catch {
@@ -98,167 +116,233 @@ export default function TaskForm({ location, vineyardId, onSubmit, onCancel }: P
     }
   }
 
+  const wtSelected = workTypes.find((w) => w.id === selectedWorkTypeId)
+  const isPflanzenschutz =
+    (recordType === 'aufgabe' && (wtSelected?.name.toLowerCase().includes('pflanzenschutz') ?? false)) ||
+    (recordType === 'beobachtung' && beobachtungType === 'pflanzenschutz')
+
   return (
     <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {error && <Alert severity="error" role="alert">{error}</Alert>}
 
-      {/* Art first — determines what appears below */}
-      <Box>
-        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-          Art
-        </Typography>
-        <ToggleButtonGroup
-          value={recordType}
-          exclusive
-          onChange={(_, v) => { if (v) { setRecordType(v); setError('') } }}
-          size="small"
-          fullWidth
-        >
-          <ToggleButton value="aufgabe" sx={{ minHeight: 44 }}>Aufgabe</ToggleButton>
-          <ToggleButton value="beobachtung" sx={{ minHeight: 44 }}>Beobachtung</ToggleButton>
-        </ToggleButtonGroup>
-      </Box>
-
-      {/* Aufgabe: dynamic work type selection */}
-      {recordType === 'aufgabe' && (
-        <Box>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-            Tätigkeit
-          </Typography>
-          {workTypesLoading ? (
-            <CircularProgress size={20} sx={{ display: 'block', my: 1 }} />
-          ) : workTypes.length === 0 ? (
-            <Typography variant="caption" color="text.secondary">
-              Keine Tätigkeiten vorhanden. Zuerst unter «Tätigkeiten» anlegen.
+      {mode === 'pflanzenschutz' ? (
+        <>
+          {/* Pflanzenschutz mode: no Art toggle, no WorkType picker */}
+          <FormControl size={inputSize} required>
+            <InputLabel>Massnahmen-Typ</InputLabel>
+            <Select
+              value={subtype}
+              label="Massnahmen-Typ"
+              onChange={(e) => setSubtype(e.target.value as TaskSubtype)}
+            >
+              <MenuItem value="spritzung">Spritzung</MenuItem>
+              <MenuItem value="dispenser-haengen">Dispenser aufhängen</MenuItem>
+              <MenuItem value="maehen">Mähen</MenuItem>
+            </Select>
+          </FormControl>
+          <TextField
+            label="Datum"
+            type="date"
+            value={observationDate}
+            onChange={(e) => setObservationDate(e.target.value)}
+            size={inputSize}
+            slotProps={{ inputLabel: { shrink: true } }}
+            helperText="Wann wurde die Massnahme durchgeführt?"
+          />
+          {subtype === 'spritzung' && <SprayFields value={spray} onChange={setSpray} />}
+          <TextField
+            id="task-notes"
+            label="Notizen"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            multiline
+            minRows={2}
+            size={inputSize}
+          />
+        </>
+      ) : (
+        <>
+          {/* Art first — determines what appears below */}
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+              Art
             </Typography>
-          ) : (
-            <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
-              {workTypes.map((wt) => (
-                <Chip
-                  key={wt.id}
-                  label={wt.name}
-                  onClick={() => { setSelectedWorkTypeId(wt.id); setError('') }}
-                  color={selectedWorkTypeId === wt.id ? 'primary' : 'default'}
-                  variant={selectedWorkTypeId === wt.id ? 'filled' : 'outlined'}
-                  sx={{ minHeight: 36 }}
-                />
-              ))}
+            <ToggleButtonGroup
+              value={recordType}
+              exclusive
+              onChange={(_, v) => { if (v) { setRecordType(v); setError('') } }}
+              size="small"
+              fullWidth
+            >
+              <ToggleButton value="aufgabe" sx={{ minHeight: 44 }}>Aufgabe</ToggleButton>
+              <ToggleButton value="beobachtung" sx={{ minHeight: 44 }}>Beobachtung</ToggleButton>
+            </ToggleButtonGroup>
+          </Box>
+
+          {/* Aufgabe: dynamic work type selection */}
+          {recordType === 'aufgabe' && (
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                Tätigkeit
+              </Typography>
+              {workTypesLoading ? (
+                <CircularProgress size={20} sx={{ display: 'block', my: 1 }} />
+              ) : workTypes.length === 0 ? (
+                <Typography variant="caption" color="text.secondary">
+                  Keine Tätigkeiten vorhanden. Zuerst unter «Tätigkeiten» anlegen.
+                </Typography>
+              ) : (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                  {workTypes.map((wt) => (
+                    <Chip
+                      key={wt.id}
+                      label={wt.name}
+                      onClick={() => { setSelectedWorkTypeId(wt.id); setError('') }}
+                      color={selectedWorkTypeId === wt.id ? 'primary' : 'default'}
+                      variant={selectedWorkTypeId === wt.id ? 'filled' : 'outlined'}
+                      sx={{ minHeight: 36 }}
+                    />
+                  ))}
+                </Box>
+              )}
             </Box>
           )}
-        </Box>
-      )}
 
-      {/* Beobachtung: two fixed types */}
-      {recordType === 'beobachtung' && (
-        <Box>
-          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-            Typ
-          </Typography>
-          <ToggleButtonGroup
-            value={beobachtungType}
-            exclusive
-            onChange={(_, v) => { if (v) setBeobachtungType(v) }}
-            size="small"
-            fullWidth
-          >
-            <ToggleButton value="phaenologie" sx={{ minHeight: 44, flexDirection: 'column', gap: 0.25, py: 0.75 }}>
-              <span aria-hidden="true" style={{ fontSize: '1.1rem' }}>🌿</span>
-              <Typography variant="caption" sx={{ lineHeight: 1.1 }}>Phänologie</Typography>
-            </ToggleButton>
-            <ToggleButton value="pflanzenschutz" sx={{ minHeight: 44, flexDirection: 'column', gap: 0.25, py: 0.75 }}>
-              <span aria-hidden="true" style={{ fontSize: '1.1rem' }}>💧</span>
-              <Typography variant="caption" sx={{ lineHeight: 1.1 }}>Pflanzenschutz</Typography>
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Box>
-      )}
-
-      {/* Phase — only for Phänologie observations */}
-      {recordType === 'beobachtung' && beobachtungType === 'phaenologie' && (() => {
-        const selectedPhase = PHASE_OPTIONS.find((p) => p.value === phase)
-        return (
-          <FormControl size={inputSize}>
-            <InputLabel id="phase-label">Phase</InputLabel>
-            <Select
-              labelId="phase-label"
-              value={phase}
-              label="Phase"
-              onChange={(e) => setPhase(e.target.value)}
-            >
-              <MenuItem value=""><em>Keine</em></MenuItem>
-              {PHASE_GROUPS.map((group) => [
-                <ListSubheader key={group.key} sx={{ fontWeight: 700, lineHeight: '28px', fontSize: '0.7rem', bgcolor: 'action.hover' }}>
-                  {group.label}
-                </ListSubheader>,
-                ...PHASE_OPTIONS.filter((p) => p.group === group.key).map((p) => (
-                  <MenuItem key={p.value} value={p.value} sx={{ pl: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 2 }}>
-                      <span>{p.label}</span>
-                      <Typography component="span" variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
-                        {p.bbch}
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                )),
-              ])}
-            </Select>
-            {selectedPhase && (
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, px: 1.5 }}>
-                {selectedPhase.description}
+          {/* Beobachtung: two fixed types */}
+          {recordType === 'beobachtung' && (
+            <Box>
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
+                Typ
               </Typography>
-            )}
-          </FormControl>
-        )
-      })()}
+              <ToggleButtonGroup
+                value={beobachtungType}
+                exclusive
+                onChange={(_, v) => { if (v) setBeobachtungType(v) }}
+                size="small"
+                fullWidth
+              >
+                <ToggleButton value="phaenologie" sx={{ minHeight: 44, flexDirection: 'column', gap: 0.25, py: 0.75 }}>
+                  <span aria-hidden="true" style={{ fontSize: '1.1rem' }}>🌿</span>
+                  <Typography variant="caption" sx={{ lineHeight: 1.1 }}>Phänologie</Typography>
+                </ToggleButton>
+                <ToggleButton value="pflanzenschutz" sx={{ minHeight: 44, flexDirection: 'column', gap: 0.25, py: 0.75 }}>
+                  <span aria-hidden="true" style={{ fontSize: '1.1rem' }}>💧</span>
+                  <Typography variant="caption" sx={{ lineHeight: 1.1 }}>Pflanzenschutz</Typography>
+                </ToggleButton>
+              </ToggleButtonGroup>
+            </Box>
+          )}
 
-      {/* Severity — only for Pflanzenschutz observations */}
-      {recordType === 'beobachtung' && beobachtungType === 'pflanzenschutz' && (
-        <FormControl size={inputSize}>
-          <InputLabel id="severity-label">Schweregrad</InputLabel>
-          <Select
-            labelId="severity-label"
-            value={severity}
-            label="Schweregrad"
-            onChange={(e) => setSeverity(e.target.value as Severity | '')}
-          >
-            <MenuItem value=""><em>Kein</em></MenuItem>
-            {(Object.keys(SEVERITY_LABELS) as Severity[]).map((s) => (
-              <MenuItem key={s} value={s}>{SEVERITY_LABELS[s]}</MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+          {/* Phase — only for Phänologie observations */}
+          {recordType === 'beobachtung' && beobachtungType === 'phaenologie' && (() => {
+            const selectedPhase = PHASE_OPTIONS.find((p) => p.value === phase)
+            return (
+              <FormControl size={inputSize}>
+                <InputLabel id="phase-label">Phase</InputLabel>
+                <Select
+                  labelId="phase-label"
+                  value={phase}
+                  label="Phase"
+                  onChange={(e) => setPhase(e.target.value)}
+                >
+                  <MenuItem value=""><em>Keine</em></MenuItem>
+                  {PHASE_GROUPS.map((group) => [
+                    <ListSubheader key={group.key} sx={{ fontWeight: 700, lineHeight: '28px', fontSize: '0.7rem', bgcolor: 'action.hover' }}>
+                      {group.label}
+                    </ListSubheader>,
+                    ...PHASE_OPTIONS.filter((p) => p.group === group.key).map((p) => (
+                      <MenuItem key={p.value} value={p.value} sx={{ pl: 2 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '100%', gap: 2 }}>
+                          <span>{p.label}</span>
+                          <Typography component="span" variant="caption" color="text.secondary" sx={{ flexShrink: 0 }}>
+                            {p.bbch}
+                          </Typography>
+                        </Box>
+                      </MenuItem>
+                    )),
+                  ])}
+                </Select>
+                {selectedPhase && (
+                  <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, px: 1.5 }}>
+                    {selectedPhase.description}
+                  </Typography>
+                )}
+              </FormControl>
+            )
+          })()}
+
+          {/* Severity — only for Pflanzenschutz observations */}
+          {recordType === 'beobachtung' && beobachtungType === 'pflanzenschutz' && (
+            <FormControl size={inputSize}>
+              <InputLabel id="severity-label">Schweregrad</InputLabel>
+              <Select
+                labelId="severity-label"
+                value={severity}
+                label="Schweregrad"
+                onChange={(e) => setSeverity(e.target.value as Severity | '')}
+              >
+                <MenuItem value=""><em>Kein</em></MenuItem>
+                {(Object.keys(SEVERITY_LABELS) as Severity[]).map((s) => (
+                  <MenuItem key={s} value={s}>{SEVERITY_LABELS[s]}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
+
+          {isPflanzenschutz && (
+            <FormControl size={inputSize}>
+              <InputLabel>Massnahmen-Typ</InputLabel>
+              <Select
+                value={subtype}
+                label="Massnahmen-Typ"
+                onChange={(e) => setSubtype(e.target.value as TaskSubtype | '')}
+              >
+                <MenuItem value="">— bitte wählen —</MenuItem>
+                <MenuItem value="spritzung">Spritzung</MenuItem>
+                <MenuItem value="dispenser-haengen">Dispenser aufhängen</MenuItem>
+                <MenuItem value="dispenser-entfernen">Dispenser entfernen</MenuItem>
+                <MenuItem value="maehen">Mähen</MenuItem>
+              </Select>
+            </FormControl>
+          )}
+          {isPflanzenschutz && subtype === 'spritzung' && (
+            <SprayFields value={spray} onChange={setSpray} />
+          )}
+
+          <TextField
+            id="task-notes"
+            label="Notizen"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            multiline
+            rows={2}
+            size={inputSize}
+          />
+        </>
       )}
 
-      <TextField
-        id="task-notes"
-        label="Notizen"
-        value={notes}
-        onChange={(e) => setNotes(e.target.value)}
-        multiline
-        rows={2}
-        size={inputSize}
-      />
-
-      {recordType === 'beobachtung' ? (
-        <TextField
-          id="observation-date"
-          label="Datum"
-          type="date"
-          value={observationDate}
-          onChange={(e) => setObservationDate(e.target.value)}
-          size={inputSize}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
-      ) : (
-        <TextField
-          id="task-due"
-          label="Fälligkeitsdatum"
-          type="date"
-          value={dueDate}
-          onChange={(e) => setDueDate(e.target.value)}
-          size={inputSize}
-          slotProps={{ inputLabel: { shrink: true } }}
-        />
+      {mode !== 'pflanzenschutz' && (
+        recordType === 'beobachtung' ? (
+          <TextField
+            id="observation-date"
+            label="Datum"
+            type="date"
+            value={observationDate}
+            onChange={(e) => setObservationDate(e.target.value)}
+            size={inputSize}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+        ) : (
+          <TextField
+            id="task-due"
+            label="Fälligkeitsdatum"
+            type="date"
+            value={dueDate}
+            onChange={(e) => setDueDate(e.target.value)}
+            size={inputSize}
+            slotProps={{ inputLabel: { shrink: true } }}
+          />
+        )
       )}
 
       <Box>

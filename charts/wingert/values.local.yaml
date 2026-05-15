@@ -4,6 +4,7 @@ backend:
   env:
     JWT_SECRET: "local-dev-secret"
     DB_PASSWORD: "local-dev-password"
+    DB_SSLMODE: "disable"
 
 frontend:
   image:

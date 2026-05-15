@@ -20,14 +20,28 @@ type stationsEntry struct {
 	expiresAt time.Time
 }
 
+type modelKey struct {
+	modelID int
+	date    string // YYYY-MM-DD
+}
+
+type modelEntry struct {
+	data      []ModelFeature
+	expiresAt time.Time
+}
+
 type Cache struct {
 	mu       sync.Mutex
 	weather  map[uuid.UUID]weatherEntry
 	stations *stationsEntry
+	models   map[modelKey]modelEntry
 }
 
 func NewCache() *Cache {
-	return &Cache{weather: make(map[uuid.UUID]weatherEntry)}
+	return &Cache{
+		weather: make(map[uuid.UUID]weatherEntry),
+		models:  make(map[modelKey]modelEntry),
+	}
 }
 
 func (c *Cache) GetWeather(vineyardID uuid.UUID) (*WeatherData, bool) {
@@ -59,4 +73,29 @@ func (c *Cache) SetStations(data []Station) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.stations = &stationsEntry{data: data, expiresAt: time.Now().Add(stationsTTL)}
+}
+
+func (c *Cache) GetModel(modelID int, date time.Time) ([]ModelFeature, bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	k := modelKey{modelID, date.Format("2006-01-02")}
+	e, ok := c.models[k]
+	if !ok || time.Now().After(e.expiresAt) {
+		return nil, false
+	}
+	return e.data, true
+}
+
+func (c *Cache) SetModel(modelID int, date time.Time, data []ModelFeature) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	k := modelKey{modelID, date.Format("2006-01-02")}
+	// Past dates can be cached longer because they don't change anymore;
+	// today and forecast change as new station readings arrive.
+	ttl := 24 * time.Hour
+	today := time.Now().UTC().Truncate(24 * time.Hour)
+	if !date.Before(today) {
+		ttl = 30 * time.Minute
+	}
+	c.models[k] = modelEntry{data: data, expiresAt: time.Now().Add(ttl)}
 }

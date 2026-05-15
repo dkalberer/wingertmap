@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { Task, TaskStatus, GeoJSONPoint, RecordType, TaskCategory, Severity } from '../types'
+import type { Task, TaskStatus, GeoJSONPoint, RecordType, TaskCategory, Severity, TaskSubtype, SprayPayload } from '../types'
 
 export async function listTasks(vineId: string): Promise<Task[]> {
   const res = await apiClient.get<Task[]>(`/vines/${vineId}/tasks`)
@@ -16,6 +16,8 @@ export interface CreateTaskParams {
   dueDate?: string
   location?: GeoJSONPoint
   vineyardId?: string
+  subtype?: TaskSubtype
+  spray?: SprayPayload
 }
 
 export async function createTask(params: CreateTaskParams): Promise<Task> {

@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PublicationData>
+  <Products>
+    <Product id="4090" wNbr="W-4090" name="Aktuan" exhaustionDeadline="" soldoutDeadline="" isSalePermission="false" terminationReason="">
+      <ProductInformation>
+        <Ingredient inPercent="10">
+          <SubstanceType SubstanceType="active"/>
+          <Substance primaryKey="9d9a5c3d-1941-4fc3-9111-1fe4cd86e28b"/>
+        </Ingredient>
+        <Ingredient inPercent="25">
+          <SubstanceType SubstanceType="active"/>
+          <Substance primaryKey="63c58a64-ed05-473a-a71d-1b266552e710"/>
+        </Ingredient>
+        <Indication dosageFrom="0.125" dosageTo="0.125" waitingPeriod="56" expenditureForm="kg/ha" expenditureTo="2">
+          <Measure primaryKey="m-spritzung"/>
+          <Culture primaryKey="2314eb9f-7207-409f-a0d4-89b6a1177363" additionalTextPrimaryKey=""/>
+          <Pest primaryKey="0251feea-4e71-4881-8b0a-09874f39277a" additionalTextPrimaryKey="" type="fungus"/>
+        </Indication>
+      </ProductInformation>
+    </Product>
+    <Product id="5500" wNbr="W-5500" name="NurApfel" exhaustionDeadline="" soldoutDeadline="" isSalePermission="false" terminationReason="">
+      <ProductInformation>
+        <Ingredient inPercent="40">
+          <SubstanceType SubstanceType="active"/>
+          <Substance primaryKey="00000000-0000-0000-0000-000000000001"/>
+        </Ingredient>
+        <Indication dosageFrom="0.1" dosageTo="0.1" waitingPeriod="21" expenditureForm="l/ha" expenditureTo="">
+          <Measure primaryKey="m-spritzung"/>
+          <Culture primaryKey="00000000-0000-0000-0000-000000000099" additionalTextPrimaryKey=""/>
+          <Pest primaryKey="00000000-0000-0000-0000-000000000010" additionalTextPrimaryKey="" type="fungus"/>
+        </Indication>
+      </ProductInformation>
+    </Product>
+  </Products>
+  <Parallelimports/>
+  <MetaData>
+    <Detail primaryKey="9d9a5c3d-1941-4fc3-9111-1fe4cd86e28b">
+      <Description value="Cymoxanil" language="de"/>
+      <Description value="Cymoxanil" language="fr"/>
+    </Detail>
+    <Detail primaryKey="63c58a64-ed05-473a-a71d-1b266552e710">
+      <Description value="Dithianon" language="de"/>
+    </Detail>
+    <Detail primaryKey="00000000-0000-0000-0000-000000000001">
+      <Description value="Other" language="de"/>
+    </Detail>
+  </MetaData>
+  <MetaData>
+    <Detail primaryKey="0251feea-4e71-4881-8b0a-09874f39277a">
+      <Description value="Falscher Mehltau der Rebe" language="de"/>
+    </Detail>
+    <Detail primaryKey="00000000-0000-0000-0000-000000000010">
+      <Description value="Apfelschorf" language="de"/>
+    </Detail>
+  </MetaData>
+  <MetaData>
+    <Detail primaryKey="2314eb9f-7207-409f-a0d4-89b6a1177363">
+      <Description value="Reben" language="de"/>
+    </Detail>
+    <Detail primaryKey="00000000-0000-0000-0000-000000000099">
+      <Description value="Kernobst" language="de"/>
+    </Detail>
+  </MetaData>
+</PublicationData>

@@ -6,6 +6,7 @@ import ForestIcon from '@mui/icons-material/Forest'
 import ListAltIcon from '@mui/icons-material/ListAlt'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import SettingsIcon from '@mui/icons-material/Settings'
+import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety'
 import AddIcon from '@mui/icons-material/Add'
 
 interface Props {
@@ -23,25 +24,33 @@ export default function MobileLayout({
   activeTab, sheetOpen, sheetContent, taskBadgeCount,
   children, onTabChange, onSheetOpenChange, onFABPress,
 }: Props) {
-  // Tabs 3+ map to the Einstellungen bottom nav item (index 3)
-  const bottomNavValue = activeTab >= 3 ? 3 : activeTab
+  // BottomNav slots (5):
+  //   0 = Weinberge        (activeTab 0)
+  //   1 = Pflanzenschutz   (activeTab 6)
+  //   2 = Aufgaben         (activeTab 1)
+  //   3 = Auswertungen     (activeTab 2)
+  //   4 = Einstellungen    (activeTab 3..5)
+  const tabToSlot: Record<number, number> = { 0: 0, 6: 1, 1: 2, 2: 3, 3: 4, 4: 4, 5: 4 }
+  const slotToTab: Record<number, number> = { 0: 0, 1: 6, 2: 1, 3: 2, 4: 3 }
+  const bottomNavValue = tabToSlot[activeTab] ?? 0
 
   function handleNavChange(_: React.SyntheticEvent, newValue: number) {
-    if (newValue === 3) {
-      const settingsTab = activeTab >= 3 ? activeTab : 3
-      if (sheetOpen && activeTab >= 3) {
+    if (newValue === 4) {
+      const settingsTab = activeTab >= 3 && activeTab <= 5 ? activeTab : 3
+      if (sheetOpen && activeTab >= 3 && activeTab <= 5) {
         onSheetOpenChange(false)
       } else {
         onTabChange(settingsTab)
         onSheetOpenChange(true)
       }
+      return
+    }
+    const targetTab = slotToTab[newValue]
+    if (sheetOpen && targetTab === activeTab) {
+      onSheetOpenChange(false)
     } else {
-      if (sheetOpen && newValue === activeTab) {
-        onSheetOpenChange(false)
-      } else {
-        onTabChange(newValue)
-        onSheetOpenChange(true)
-      }
+      onTabChange(targetTab)
+      onSheetOpenChange(true)
     }
   }
 
@@ -71,7 +80,7 @@ export default function MobileLayout({
         </Box>
 
         {/* Einstellungen sub-navigation */}
-        {activeTab >= 3 && (
+        {activeTab >= 3 && activeTab <= 5 && (
           <Box sx={{ display: 'flex', px: 2, pb: 1, gap: 1, flexShrink: 0 }}>
             <Button size="small" variant={activeTab === 3 ? 'contained' : 'outlined'} onClick={() => onTabChange(3)} sx={{ flex: 1, minHeight: 36 }}>
               Sorten
@@ -125,6 +134,7 @@ export default function MobileLayout({
         }}
       >
         <BottomNavigationAction label="Weinberge" icon={<ForestIcon />} />
+        <BottomNavigationAction label="Pflanzenschutz" icon={<HealthAndSafetyIcon />} />
         <BottomNavigationAction
           label="Aufgaben"
           icon={
@@ -137,7 +147,7 @@ export default function MobileLayout({
         <BottomNavigationAction
           label="Einstellungen"
           icon={
-            <Badge variant="dot" invisible={activeTab < 4} color="primary">
+            <Badge variant="dot" invisible={activeTab < 4 || activeTab > 5} color="primary">
               <SettingsIcon />
             </Badge>
           }

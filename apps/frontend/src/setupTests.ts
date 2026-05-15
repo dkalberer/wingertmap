@@ -20,3 +20,11 @@ const localStorageMock = {
 if (typeof localStorage === 'undefined' || !(localStorage.getItem instanceof Function)) {
   Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, writable: true })
 }
+
+// jsdom polyfill — Recharts ResponsiveContainer requires ResizeObserver
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+;(globalThis as unknown as { ResizeObserver: typeof ResizeObserverMock }).ResizeObserver = ResizeObserverMock

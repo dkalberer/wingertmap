@@ -75,6 +75,19 @@ export default function SprayHistorySection({ vineyardId }: Props) {
                   <Typography variant="caption" color="text.secondary" component="span">
                     {taskDate(t)}
                   </Typography>
+                  {t.spray?.productNames && t.spray.productNames.length > 0 && (
+                    <Box component="span" sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5, mt: 0.25 }}>
+                      {t.spray.productNames.map((name) => (
+                        <Chip
+                          key={name}
+                          label={name}
+                          size="small"
+                          variant="outlined"
+                          sx={{ fontSize: '0.65rem', height: 18 }}
+                        />
+                      ))}
+                    </Box>
+                  )}
                   {t.notes && (
                     <Typography variant="caption" color="text.secondary" component="span"
                       sx={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>

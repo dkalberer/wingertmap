@@ -211,7 +211,9 @@ type Task struct {
 	AssignedTo  *uuid.UUID   `json:"assignedTo,omitempty"`
 	DueDate     *time.Time   `json:"dueDate,omitempty"`
 	CompletedAt *time.Time   `json:"completedAt,omitempty"`
-	CreatedBy   *uuid.UUID   `json:"createdBy,omitempty"`
-	CreatedAt   time.Time    `json:"createdAt"`
+	CreatedBy   *uuid.UUID        `json:"createdBy,omitempty"`
+	CreatedAt   time.Time         `json:"createdAt"`
+	Subtype     *string           `json:"subtype,omitempty"`
+	Spray       *SprayApplication `json:"spray,omitempty"`
 }
 

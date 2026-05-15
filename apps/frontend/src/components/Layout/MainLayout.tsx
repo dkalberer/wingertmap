@@ -6,12 +6,14 @@ import {
 } from '@mui/material'
 import LogoutIcon from '@mui/icons-material/Logout'
 import ManageAccountsIcon from '@mui/icons-material/ManageAccounts'
+import AddIcon from '@mui/icons-material/Add'
 import ForestIcon from '@mui/icons-material/Forest'
 import GrapeIcon from '@mui/icons-material/Spa'
 import PeopleIcon from '@mui/icons-material/People'
 import ListAltIcon from '@mui/icons-material/ListAlt'
 import BarChartIcon from '@mui/icons-material/BarChart'
 import WorkIcon from '@mui/icons-material/Work'
+import HealthAndSafetyIcon from '@mui/icons-material/HealthAndSafety'
 import { useAuthStore } from '../../store/authStore'
 import { useMapStore } from '../../store/mapStore'
 import { useVineyardStore } from '../../store/vineyardStore'
@@ -30,6 +32,7 @@ import WorkTypesPage from '../Personal/WorkTypesPage'
 import AnalyticsPage from '../Analytics/AnalyticsPage'
 import DesktopLayout from './DesktopLayout'
 import MobileLayout from './MobileLayout'
+import ProtectionPanel from '../Vineyard/ProtectionPanel'
 import QuickActionSheet from './QuickActionSheet'
 import QuickTimeEntrySheet from './QuickTimeEntrySheet'
 import QuickHarvestSheet from './QuickHarvestSheet'
@@ -46,11 +49,13 @@ const TAB_LABELS: Record<number, string> = {
   3: 'Sorten',
   4: 'Personal',
   5: 'Tätigkeiten',
+  6: 'Pflanzenschutz',
 }
 
 const nutzungItems = [
   { index: 0, label: 'Weinberge', icon: <ForestIcon fontSize="small" /> },
   { index: 1, label: 'Aufgaben', icon: <ListAltIcon fontSize="small" /> },
+  { index: 6, label: 'Pflanzenschutz', icon: <HealthAndSafetyIcon fontSize="small" /> },
 ]
 const analyseItems = [
   { index: 2, label: 'Auswertungen', icon: <BarChartIcon fontSize="small" /> },
@@ -94,6 +99,7 @@ export default function MainLayout() {
   const [hoursSheetOpen, setHoursSheetOpen] = useState(false)
   const [harvestSheetOpen, setHarvestSheetOpen] = useState(false)
   const [pruningSheetOpen, setPruningSheetOpen] = useState(false)
+  const [taskDialogMode, setTaskDialogMode] = useState<'pflanzenschutz' | null>(null)
   const flyToRef = useRef<((lat: number, lng: number, zoom?: number) => void) | null>(null)
   const pendingFlyToRef = useRef<[number, number, number] | null>(null)
   const hasAutoSelected = useRef(false)
@@ -184,6 +190,12 @@ export default function MainLayout() {
   }
 
   function handleQuickTask() {
+    setTaskDialogMode(null)
+    triggerFAB()
+  }
+
+  function handleQuickPflanzenschutz() {
+    setTaskDialogMode('pflanzenschutz')
     triggerFAB()
   }
 
@@ -231,6 +243,7 @@ export default function MainLayout() {
         pendingLocation={pendingLocation}
         selectedTask={selectedTask}
         fabTrigger={fabTrigger}
+        mode={taskDialogMode}
         onStartPicking={handleStartPicking}
         onCancelPicking={() => { setPickingLocation(false); setPendingLocation(null) }}
         onCreate={handleCreateTask}
@@ -238,6 +251,7 @@ export default function MainLayout() {
         onDelete={removeTask}
         onLocate={handleLocateTask}
         onTaskSelect={handleTaskSelect}
+        onDialogClose={() => setTaskDialogMode(null)}
       />
     </Box>,
     <AnalyticsPage key="analytics" vineyard={selected} />,
@@ -249,6 +263,15 @@ export default function MainLayout() {
     </Box>,
     <Box key="workTypes" sx={{ overflow: 'auto', flex: 1, minHeight: 0 }}>
       <WorkTypesPage />
+    </Box>,
+    <Box key="pflanzenschutz" sx={{ overflow: 'auto', flex: 1, minHeight: 0, p: 2 }}>
+      {selected ? (
+        <ProtectionPanel vineyardId={selected.id} />
+      ) : (
+        <Typography variant="body2" color="text.secondary">
+          Wähle einen Wingert im «Weinberge»-Tab, um den Pflanzenschutz-Status zu sehen.
+        </Typography>
+      )}
     </Box>,
   ]
 
@@ -321,6 +344,17 @@ export default function MainLayout() {
               <ManageAccountsIcon fontSize="small" />
             </IconButton>
           )}
+          {token && !isMobile && (
+            <IconButton
+              color="inherit"
+              onClick={openQuickAction}
+              sx={{ minWidth: 44, minHeight: 44 }}
+              title="Schnellaktionen"
+              aria-label="Schnellaktionen"
+            >
+              <AddIcon />
+            </IconButton>
+          )}
           <IconButton color="inherit" onClick={logout} aria-label="Abmelden" title="Abmelden">
             <LogoutIcon />
           </IconButton>
@@ -360,6 +394,7 @@ export default function MainLayout() {
         hasVineyard={!!selected}
         onClose={closeQuickAction}
         onCreateTask={handleQuickTask}
+        onCreatePflanzenschutz={handleQuickPflanzenschutz}
         onLogHours={handleQuickHours}
         onLogHarvest={handleQuickHarvest}
         onLogPruning={handleQuickPruning}

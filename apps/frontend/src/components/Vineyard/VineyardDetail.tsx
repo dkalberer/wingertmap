@@ -1,7 +1,6 @@
 import { Box, Divider, Typography } from '@mui/material'
 import type { Vineyard } from '../../types'
 import WeatherWidget from './WeatherWidget'
-import ProtectionBadge from './ProtectionBadge'
 import SprayHistorySection from './SprayHistorySection'
 import JournalSection from './JournalSection'
 
@@ -18,10 +17,6 @@ export default function VineyardDetail({ vineyard }: Props) {
           {vineyard.description}
         </Typography>
       )}
-
-      <Box sx={{ mt: 1.5 }}>
-        <ProtectionBadge vineyardId={vineyard.id} />
-      </Box>
 
       <Box sx={{ mt: 1.5 }}>
         <SprayHistorySection vineyardId={vineyard.id} />

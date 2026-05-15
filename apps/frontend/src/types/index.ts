@@ -111,6 +111,18 @@ export interface Task {
   completedAt?: string
   createdBy?: string
   createdAt: string
+  subtype?: string
+  spray?: SprayApplicationSummary
+}
+
+export interface SprayApplicationSummary {
+  taskId: string
+  productIds?: string[]
+  productNames?: string[]
+  substanceIds?: string[]
+  dosage?: number
+  dosageUnit?: string
+  appliedAt: string
 }
 
 // Auth
@@ -211,6 +223,128 @@ export interface PruningRecord {
   notes?: string
   createdBy: string
   createdAt: string
+}
+
+export type DiseaseLevel = 'grün' | 'gelb' | 'rot' | ''
+export type MeasureKind = 'spray' | 'dispenser' | 'mowing-pause' | ''
+export type TaskSubtype =
+  | 'spritzung'
+  | 'dispenser-haengen'
+  | 'maehen'
+
+export interface DiseaseResult {
+  key: string
+  name: string
+  modelId: number
+  rawIndex: number
+  rawLevel: DiseaseLevel
+  effectiveIndex: number
+  effectiveLevel: DiseaseLevel
+  measureType?: MeasureKind
+  lastMeasureAt?: string
+  recommendation?: string
+  indexUnit?: string
+  indexHelp?: string
+  prevIndex?: number
+  indexDelta?: number
+  indexLabel?: string
+  recentMaxIndex?: number
+  recentMaxAt?: string
+  incubationDays?: number
+  protectionDaysTotal?: number
+  protectionDaysRemaining?: number
+}
+
+export interface SprayWindow {
+  start: string
+  end: string
+  hoursDry: number
+  source: string
+  avgTempC?: number
+  minTempC?: number
+  maxTempC?: number
+  avgLeafWetPct?: number
+  hints?: string[]
+}
+
+export interface DiseaseRiskResponse {
+  vineyardId: string
+  stationId: number
+  stationName: string
+  fetchedAt: string
+  phenology?: { rawIndex: number; label: string }
+  diseases: DiseaseResult[]
+  psmSyncStale?: boolean
+  psmSyncAt?: string
+  sprayWindow?: SprayWindow
+}
+
+export interface DiseaseSeriesPoint {
+  date: string
+  index: number
+  level: DiseaseLevel
+}
+
+export interface DiseaseMeasure {
+  kind: string
+  at: string
+  label?: string
+}
+
+export interface DiseaseSeriesWeather {
+  date: string
+  avgTempC: number
+  minTempC: number
+  maxTempC: number
+  precipMm: number
+  avgLeafWetPct: number
+}
+
+export interface DiseaseSeriesResponse {
+  vineyardId: string
+  diseaseKey: string
+  diseaseName: string
+  stationId: number
+  stationName: string
+  from: string
+  to: string
+  points: DiseaseSeriesPoint[]
+  measures: DiseaseMeasure[]
+  weather?: DiseaseSeriesWeather[]
+}
+
+export interface PsmSubstance {
+  id: string
+  nameDe: string
+}
+
+export interface PsmIndication {
+  id: number
+  productId: string
+  pestId: string
+  pestName?: string
+  dosageFrom?: number
+  dosageTo?: number
+  dosageUnit?: string
+  waitingPeriodDays?: number
+}
+
+export interface PsmProduct {
+  id: string
+  wNbr: string
+  name: string
+  isParallelImport?: boolean
+  substances?: PsmSubstance[]
+  indications?: PsmIndication[]
+}
+
+export interface SprayPayload {
+  productIds: string[]
+  substanceIds: string[]
+  targetPestIds?: string[]
+  dosage?: number
+  dosageUnit?: string
+  notes?: string
 }
 
 // API response wrappers

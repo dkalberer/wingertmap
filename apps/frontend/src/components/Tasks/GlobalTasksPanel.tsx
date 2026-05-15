@@ -17,6 +17,7 @@ interface Props {
   pendingLocation: GeoJSONPoint | null
   selectedTask: Task | null
   fabTrigger?: number
+  mode?: 'pflanzenschutz' | null
   onStartPicking: () => void
   onCancelPicking: () => void
   onCreate: (params: CreateTaskParams) => Promise<Task>
@@ -24,13 +25,14 @@ interface Props {
   onDelete: (id: string) => void
   onLocate: (task: Task) => void
   onTaskSelect: (task: Task | null) => void
+  onDialogClose?: () => void
 }
 
 export default function GlobalTasksPanel({
   tasks, loading, error,
   pendingLocation, selectedTask, fabTrigger,
-  onStartPicking, onCancelPicking,
-  onCreate, onStatusChange, onDelete, onLocate, onTaskSelect,
+  mode, onStartPicking, onCancelPicking,
+  onCreate, onStatusChange, onDelete, onLocate, onTaskSelect, onDialogClose,
 }: Props) {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [subTab, setSubTab] = useState<0 | 1>(0)
@@ -66,12 +68,14 @@ export default function GlobalTasksPanel({
     const task = await onCreate(params)
     setDialogOpen(false)
     onCancelPicking()
+    onDialogClose?.()
     return task
   }
 
   function handleClose() {
     setDialogOpen(false)
     onCancelPicking()
+    onDialogClose?.()
   }
 
   function handleBack() {
@@ -141,6 +145,7 @@ export default function GlobalTasksPanel({
       <CreateTaskDialog
         open={dialogOpen}
         pendingLocation={pendingLocation}
+        mode={mode ?? undefined}
         onStartPicking={handleDialogStartPicking}
         onSubmit={handleSubmit}
         onClose={handleClose}

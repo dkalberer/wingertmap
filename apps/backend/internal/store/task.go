@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 	"wingert/backend/internal/domain"
 )
@@ -55,11 +56,15 @@ func (s *TaskStore) Create(p domain.TaskCreateParams) (*domain.Task, error) {
 		locationGeoJSON = &s
 	}
 
+	status := domain.TaskStatusOpen
+	if p.Status != nil {
+		status = *p.Status
+	}
 	err := s.db.Exec(`
-		INSERT INTO tasks (id, vine_id, vineyard_id, title, record_type, category, severity, phase, status, notes, location, due_date, created_by)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromGeoJSON(?), ?, ?)`,
+		INSERT INTO tasks (id, vine_id, vineyard_id, title, record_type, category, severity, phase, status, notes, location, due_date, created_by, subtype, completed_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ST_GeomFromGeoJSON(?), ?, ?, ?, ?)`,
 		id, p.VineID, p.VineyardID, p.Title, p.RecordType, p.Category, p.Severity, p.Phase,
-		domain.TaskStatusOpen, p.Notes, locationGeoJSON, dueDate, p.CreatedBy,
+		status, p.Notes, locationGeoJSON, dueDate, p.CreatedBy, p.Subtype, p.CompletedAt,
 	).Error
 	if err != nil {
 		return nil, err
@@ -94,7 +99,7 @@ func (s *TaskStore) LatestSprayTask(vineyardID uuid.UUID) (*domain.Task, error) 
 	var rows []taskScanRow
 	err := s.db.Raw(`
 		SELECT id, vine_id, vineyard_id, title, record_type, category, severity, phase, status, notes,
-		       assigned_to, due_date, completed_at, created_by, created_at,
+		       assigned_to, due_date, completed_at, created_by, created_at, subtype,
 		       ST_AsGeoJSON(location) AS location_geojson
 		FROM tasks
 		WHERE vineyard_id = ? AND category = 'pflanzenschutz'
@@ -123,6 +128,7 @@ func (s *TaskStore) LatestSprayTask(vineyardID uuid.UUID) (*domain.Task, error) 
 		CompletedAt: r.CompletedAt,
 		CreatedBy:   r.CreatedBy,
 		CreatedAt:   r.CreatedAt,
+		Subtype:     r.Subtype,
 	}
 	if r.LocationGeoJSON != "" {
 		t.Location = &domain.GeoJSON{RawMessage: json.RawMessage(r.LocationGeoJSON)}
@@ -155,6 +161,7 @@ type taskScanRow struct {
 	CompletedAt     *time.Time          `gorm:"column:completed_at"`
 	CreatedBy       *uuid.UUID          `gorm:"column:created_by"`
 	CreatedAt       time.Time           `gorm:"column:created_at"`
+	Subtype         *string             `gorm:"column:subtype"`
 	LocationGeoJSON string              `gorm:"column:location_geojson"`
 }
 
@@ -162,7 +169,7 @@ func (s *TaskStore) query(where string, arg any) ([]domain.Task, error) {
 	var rows []taskScanRow
 	err := s.db.
 		Raw(`SELECT id, vine_id, vineyard_id, title, record_type, category, severity, phase, status, notes,
-		            assigned_to, due_date, completed_at, created_by, created_at,
+		            assigned_to, due_date, completed_at, created_by, created_at, subtype,
 		            ST_AsGeoJSON(location) AS location_geojson
 		     FROM tasks WHERE `+where+` ORDER BY created_at DESC`, arg).
 		Scan(&rows).Error
@@ -170,6 +177,7 @@ func (s *TaskStore) query(where string, arg any) ([]domain.Task, error) {
 		return nil, err
 	}
 	result := make([]domain.Task, len(rows))
+	taskIDs := make([]uuid.UUID, 0, len(rows))
 	for i, r := range rows {
 		t := domain.Task{
 			ID:          r.ID,
@@ -187,12 +195,63 @@ func (s *TaskStore) query(where string, arg any) ([]domain.Task, error) {
 			CompletedAt: r.CompletedAt,
 			CreatedBy:   r.CreatedBy,
 			CreatedAt:   r.CreatedAt,
+			Subtype:     r.Subtype,
 		}
 		if r.LocationGeoJSON != "" {
 			t.Location = &domain.GeoJSON{RawMessage: json.RawMessage(r.LocationGeoJSON)}
 		}
 		result[i] = t
+		taskIDs = append(taskIDs, r.ID)
+	}
+	if len(taskIDs) > 0 {
+		sprays, err := s.loadSpraysForTasks(taskIDs)
+		if err != nil {
+			return nil, err
+		}
+		for i := range result {
+			if sp, ok := sprays[result[i].ID]; ok {
+				s := sp
+				result[i].Spray = &s
+			}
+		}
 	}
 	return result, nil
+}
+
+func (s *TaskStore) loadSpraysForTasks(taskIDs []uuid.UUID) (map[uuid.UUID]domain.SprayApplication, error) {
+	var rows []struct {
+		TaskID       uuid.UUID      `gorm:"column:task_id"`
+		ProductIDs   pq.StringArray `gorm:"column:product_ids"`
+		ProductNames pq.StringArray `gorm:"column:product_names"`
+		Dosage       *float64       `gorm:"column:dosage"`
+		DosageUnit   string         `gorm:"column:dosage_unit"`
+		AppliedAt    time.Time      `gorm:"column:applied_at"`
+	}
+	err := s.db.Raw(`
+		SELECT sa.task_id,
+		       sa.product_ids,
+		       (SELECT COALESCE(array_agg(p.name ORDER BY p.name), '{}')
+		          FROM psm_products p
+		          WHERE p.id = ANY(sa.product_ids)) AS product_names,
+		       sa.dosage,
+		       sa.dosage_unit,
+		       sa.applied_at
+		FROM spray_applications sa
+		WHERE sa.task_id IN (?)`, taskIDs).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[uuid.UUID]domain.SprayApplication, len(rows))
+	for _, r := range rows {
+		out[r.TaskID] = domain.SprayApplication{
+			TaskID:       r.TaskID,
+			ProductIDs:   []string(r.ProductIDs),
+			ProductNames: []string(r.ProductNames),
+			Dosage:       r.Dosage,
+			DosageUnit:   r.DosageUnit,
+			AppliedAt:    r.AppliedAt,
+		}
+	}
+	return out, nil
 }
 

@@ -39,6 +39,10 @@ func ClaimsFromContext(ctx context.Context) *service.Claims {
 }
 
 
+// CORS is a no-op middleware kept for compatibility with the existing test suite.
+// The real CORS handler is configured at the router level via go-chi/cors.
+var CORS = func(next http.Handler) http.Handler { return next }
+
 func writeUnauthorized(w http.ResponseWriter, msg string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusUnauthorized)

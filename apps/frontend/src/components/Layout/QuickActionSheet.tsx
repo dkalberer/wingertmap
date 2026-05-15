@@ -5,6 +5,7 @@ import AgricultureIcon from '@mui/icons-material/Agriculture'
 import ContentCutIcon from '@mui/icons-material/ContentCut'
 import PentagonIcon from '@mui/icons-material/Pentagon'
 import TimelineIcon from '@mui/icons-material/Timeline'
+import BugReportIcon from '@mui/icons-material/BugReport'
 
 interface Action {
   icon: React.ReactNode
@@ -19,6 +20,7 @@ interface Props {
   hasVineyard: boolean
   onClose: () => void
   onCreateTask: () => void
+  onCreatePflanzenschutz: () => void
   onLogHours: () => void
   onLogHarvest: () => void
   onLogPruning: () => void
@@ -28,7 +30,7 @@ interface Props {
 
 export default function QuickActionSheet({
   open, hasVineyard, onClose,
-  onCreateTask, onLogHours, onLogHarvest, onLogPruning, onDrawVineyard, onDrawRow,
+  onCreateTask, onCreatePflanzenschutz, onLogHours, onLogHarvest, onLogPruning, onDrawVineyard, onDrawRow,
 }: Props) {
   const actions: Action[] = [
     {
@@ -36,6 +38,12 @@ export default function QuickActionSheet({
       label: 'Aufgabe erstellen',
       description: 'Aufgabe oder Beobachtung erfassen',
       onClick: () => { onClose(); onCreateTask() },
+    },
+    {
+      icon: <BugReportIcon sx={{ fontSize: 28, color: 'success.main' }} />,
+      label: 'Pflanzenschutz-Massnahme',
+      description: 'Spritzung, Dispenser oder Mahd-Pause erfassen',
+      onClick: () => { onClose(); onCreatePflanzenschutz() },
     },
     {
       icon: <AccessTimeIcon sx={{ fontSize: 28, color: 'secondary.main' }} />,

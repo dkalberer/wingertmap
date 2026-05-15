@@ -19,6 +19,8 @@ import (
 	"wingert/backend/internal/handler"
 	hmw "wingert/backend/internal/handler/middleware"
 	"wingert/backend/internal/platform"
+	"wingert/backend/internal/protection"
+	"wingert/backend/internal/psm"
 	"wingert/backend/internal/service"
 	"wingert/backend/internal/store"
 )
@@ -51,6 +53,9 @@ func main() {
 	rowStore := store.NewRowStore(db)
 	vineStore := store.NewVineStore(db)
 	taskStore := store.NewTaskStore(db)
+	sprayStore := store.NewSprayStore(db)
+	psmStore := store.NewPSMStore(db)
+	protectionStore := store.NewProtectionPeriodStore(db)
 	varietyStore := store.NewGrapeVarietyStore(db)
 	harvestStore := store.NewHarvestStore(db)
 	pruningStore := store.NewPruningStore(db)
@@ -62,11 +67,15 @@ func main() {
 	agroClient := agrometeo.NewClient()
 	agroCache := agrometeo.NewCache()
 
+	psmSync := psm.NewSyncService(psmStore, psm.DefaultPSMZipURL, protection.RebenCultureID)
+	riskSvc := protection.NewRiskService(vineyardStore, agroClient, sprayStore, psmStore, protectionStore, agroCache)
+	periodWriter := protection.NewPeriodWriter(protectionStore)
+
 	authH := handler.NewAuthHandler(authSvc)
 	vineyardH := handler.NewVineyardHandler(vineyardStore)
 	rowH := handler.NewRowHandler(rowStore)
 	vineH := handler.NewVineHandler(vineStore)
-	taskH := handler.NewTaskHandler(taskStore)
+	taskH := handler.NewTaskHandler(taskStore, sprayStore, periodWriter)
 	varietyH := handler.NewGrapeVarietyHandler(varietyStore)
 	harvestH := handler.NewHarvestHandler(harvestStore)
 	pruningH := handler.NewPruningHandler(pruningStore)
@@ -76,6 +85,8 @@ func main() {
 	timeEntryH := handler.NewTimeEntryHandler(timeEntryStore)
 	weatherH := handler.NewWeatherHandler(vineyardStore, taskStore, agroClient, agroCache)
 	photoH := handler.NewPhotoHandler(db, minioClient, cfg.S3Bucket)
+	diseaseH := handler.NewDiseaseHandler(riskSvc)
+	psmH := handler.NewPSMHandler(psmStore)
 
 	jwtMW := hmw.NewJWT(cfg.JWTSecret)
 
@@ -172,10 +183,19 @@ func main() {
 
 		r.Get("/api/tasks/{taskID}/photos", photoH.List)
 		r.Post("/api/tasks/{taskID}/photos", photoH.Upload)
+
+		r.Get("/api/vineyards/{id}/disease-risk", diseaseH.Get)
+			r.Get("/api/vineyards/{id}/disease-risk/{key}/series", diseaseH.Series)
+		r.Get("/api/psm/products", psmH.SearchProducts)
+		r.Get("/api/psm/products/{id}", psmH.GetProduct)
+		r.Get("/api/psm/substances", psmH.SearchSubstances)
 	})
 
 	// Photo content is served without JWT — the URL is unguessable (UUID-based)
 	r.Get("/api/tasks/{taskID}/photos/{photoID}/content", photoH.Content)
+
+	psmScheduler := psm.NewScheduler(psmSync, 7*24*time.Hour)
+	psmScheduler.Start(context.Background())
 
 	srv := &http.Server{Addr: ":" + cfg.Port, Handler: r}
 	go func() {

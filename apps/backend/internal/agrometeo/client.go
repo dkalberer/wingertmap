@@ -1,9 +1,11 @@
 package agrometeo
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"math"
 	"net/http"
 	"strconv"
@@ -40,10 +42,24 @@ type WeatherData struct {
 	FetchedAt   time.Time `json:"fetchedAt"`
 }
 
-type Client struct{ http *http.Client }
+type Client struct {
+	http         *http.Client
+	baseOverride string
+}
 
 func NewClient() *Client {
 	return &Client{http: &http.Client{Timeout: 10 * time.Second}}
+}
+
+func NewClientWithBase(base string) *Client {
+	return &Client{http: &http.Client{Timeout: 10 * time.Second}, baseOverride: base}
+}
+
+func (c *Client) base() string {
+	if c.baseOverride != "" {
+		return c.baseOverride
+	}
+	return baseURL
 }
 
 func (c *Client) FetchStations(ctx context.Context) ([]Station, error) {
@@ -124,20 +140,122 @@ func (c *Client) FetchWeather(ctx context.Context, stationID int) (*WeatherData,
 	return w, nil
 }
 
+type ModelFeature struct {
+	StationID   int     `json:"stationId"`
+	StationName string  `json:"stationName"`
+	Index       float64 `json:"index"`
+	Color       string  `json:"color"`
+	Time        string  `json:"time"`
+	Risikolevel *int    `json:"risikolevel,omitempty"`
+	Risikostufe *int    `json:"risikostufe,omitempty"`
+}
+
+func (c *Client) FetchModelGeojson(ctx context.Context, modelID int, date time.Time) ([]ModelFeature, error) {
+	url := fmt.Sprintf("/models/%d/geojson?date=%s", modelID, date.Format("2006-01-02"))
+	raw, err := c.getRaw(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+	// Some models (e.g. Botrytis, id 15) return a bare `[]` instead of a
+	// FeatureCollection when no data is available. Detect that shape and
+	// treat it as an empty result rather than a parse error.
+	trimmed := bytes.TrimLeft(raw, " \t\r\n")
+	if len(trimmed) > 0 && trimmed[0] == '[' {
+		return nil, nil
+	}
+	var resp struct {
+		Features []struct {
+			Properties struct {
+				StationID   int     `json:"station_id"`
+				StationName string  `json:"station_name"`
+				Index       float64 `json:"index"`
+				Color       string  `json:"color"`
+				Time        string  `json:"time"`
+				Risikolevel *int    `json:"Risikolevel,omitempty"`
+				Risikostufe *int    `json:"Risikostufe,omitempty"`
+			} `json:"properties"`
+		} `json:"features"`
+	}
+	if err := json.Unmarshal(raw, &resp); err != nil {
+		return nil, fmt.Errorf("agrometeo: parse model %d response: %w", modelID, err)
+	}
+	out := make([]ModelFeature, len(resp.Features))
+	for i, f := range resp.Features {
+		out[i] = ModelFeature{
+			StationID:   f.Properties.StationID,
+			StationName: f.Properties.StationName,
+			Index:       f.Properties.Index,
+			Color:       f.Properties.Color,
+			Time:        f.Properties.Time,
+			Risikolevel: f.Properties.Risikolevel,
+			Risikostufe: f.Properties.Risikostufe,
+		}
+	}
+	return out, nil
+}
+
+type HourlyPoint struct {
+	Time       time.Time `json:"time"`
+	PrecipMm   float64   `json:"precipMm"`
+	LeafWetPct float64   `json:"leafWetPct"`
+	TempC      float64   `json:"tempC"`
+}
+
+// FetchHourlyWeather returns hourly observations + forecast for the station,
+// in the inclusive date range [from, to]. Uses sensors 1 (temp avg), 6 (precip sum),
+// 7 (leaf wet avg).
+func (c *Client) FetchHourlyWeather(ctx context.Context, stationID int, from, to time.Time) ([]HourlyPoint, error) {
+	url := fmt.Sprintf("/meteo/stations/%d/data?from=%s&to=%s&scale=hour&sensors=1:avg,6:sum,7:avg",
+		stationID, from.Format("2006-01-02"), to.Format("2006-01-02"))
+	var resp struct {
+		Data []map[string]string `json:"data"`
+	}
+	if err := c.get(ctx, url, &resp); err != nil {
+		return nil, err
+	}
+	out := make([]HourlyPoint, 0, len(resp.Data))
+	for _, row := range resp.Data {
+		t, err := time.Parse("2006-01-02 15:04:05", row["date"])
+		if err != nil {
+			continue
+		}
+		p := HourlyPoint{Time: t}
+		if v, err := strconv.ParseFloat(row["series_6_sum"], 64); err == nil {
+			p.PrecipMm = v
+		}
+		if v, err := strconv.ParseFloat(row["series_7_avg"], 64); err == nil {
+			p.LeafWetPct = v
+		}
+		if v, err := strconv.ParseFloat(row["series_1_avg"], 64); err == nil {
+			p.TempC = v
+		}
+		out = append(out, p)
+	}
+	return out, nil
+}
+
 func (c *Client) get(ctx context.Context, path string, dst any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, baseURL+path, nil)
+	raw, err := c.getRaw(ctx, path)
 	if err != nil {
 		return err
+	}
+	return json.Unmarshal(raw, dst)
+}
+
+func (c *Client) getRaw(ctx context.Context, path string) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.base()+path, nil)
+	if err != nil {
+		return nil, err
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("agrometeo: status %d for %s", resp.StatusCode, path)
+		return nil, fmt.Errorf("agrometeo: status %d for %s", resp.StatusCode, path)
 	}
-	return json.NewDecoder(resp.Body).Decode(dst)
+	return io.ReadAll(resp.Body)
 }
 
 // NearestStation returns the station closest to the given lat/lng.

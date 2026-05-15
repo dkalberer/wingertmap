@@ -1,6 +1,10 @@
 package domain
 
-import "github.com/google/uuid"
+import (
+	"time"
+
+	"github.com/google/uuid"
+)
 
 // VineyardRepository defines all persistence operations for vineyards.
 type VineyardRepository interface {
@@ -152,17 +156,31 @@ type PruningRepository interface {
 
 // TaskCreateParams holds all fields for creating a task.
 type TaskCreateParams struct {
-	VineID     *uuid.UUID
-	VineyardID *uuid.UUID
-	Title      string
-	RecordType RecordType
-	Category   TaskCategory
-	Severity   *Severity
-	Phase      *string
-	Notes      string
-	Location   *GeoJSON
-	DueDate    *string
-	CreatedBy  uuid.UUID
+	VineID      *uuid.UUID
+	VineyardID  *uuid.UUID
+	Title       string
+	RecordType  RecordType
+	Category    TaskCategory
+	Severity    *Severity
+	Phase       *string
+	Notes       string
+	Location    *GeoJSON
+	DueDate     *string
+	CreatedBy   uuid.UUID
+	Subtype     *string
+	Spray       *SprayCreateInput
+	Status      *TaskStatus // optional: defaults to TaskStatusOpen
+	CompletedAt *time.Time  // optional: set when task is created already completed
+}
+
+// SprayCreateInput holds the spray-specific fields when creating a task.
+type SprayCreateInput struct {
+	ProductID     *string
+	SubstanceIDs  []uuid.UUID
+	TargetPestIDs []uuid.UUID
+	Dosage        *float64
+	DosageUnit    string
+	Notes         string
 }
 
 // TaskRepository defines all persistence operations for tasks.

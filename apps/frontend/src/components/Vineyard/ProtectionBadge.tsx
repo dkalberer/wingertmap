@@ -1,39 +1,40 @@
 import { useEffect, useState } from 'react'
 import { Box, Chip, Skeleton, Tooltip, Typography } from '@mui/material'
-import type { PlantProtectionStatus } from '../../types'
-import { getProtectionStatus } from '../../api/weather'
+import type { DiseaseRiskResponse } from '../../types'
+import { getDiseaseRisk } from '../../api/protection'
 
 interface Props {
   vineyardId: string
 }
 
-// Map protection level to MUI color prop — uses theme palette instead of hardcoded hex
 const LEVEL_CHIP_COLOR = {
   grün: 'success',
   gelb: 'warning',
-  rot:  'error',
+  rot: 'error',
 } as const
 
 const LEVEL_ICON: Record<string, string> = {
   grün: '🟢',
   gelb: '🟡',
-  rot:  '🔴',
+  rot: '🔴',
 }
 
+const AGGREGATE_KEYS = new Set(['mildiou', 'oidium', 'black-rot', 'botrytis', 'acariose'])
+
 export default function ProtectionBadge({ vineyardId }: Props) {
-  const [status, setStatus] = useState<PlantProtectionStatus | null>(null)
+  const [data, setData] = useState<DiseaseRiskResponse | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getProtectionStatus(vineyardId)
-      .then(setStatus)
-      .catch(() => setStatus(null))
+    getDiseaseRisk(vineyardId)
+      .then(setData)
+      .catch(() => setData(null))
       .finally(() => setLoading(false))
   }, [vineyardId])
 
   if (loading) return <Skeleton variant="rounded" width={180} height={28} />
 
-  if (!status) {
+  if (!data) {
     return (
       <Chip
         label="Pflanzenschutz: kein Eintrag"
@@ -43,35 +44,33 @@ export default function ProtectionBadge({ vineyardId }: Props) {
     )
   }
 
-  const icon = LEVEL_ICON[status.level] ?? '⚪'
-  const chipColor = LEVEL_CHIP_COLOR[status.level as keyof typeof LEVEL_CHIP_COLOR] ?? 'default'
-  const days = status.daysSinceSpray
-
-  const label = days !== null
-    ? `${icon} Pflanzenschutz · vor ${days} Tag${days === 1 ? '' : 'en'}`
-    : `${icon} Pflanzenschutz · kein Eintrag`
-
-  const tooltipLines = [
-    `Schutzgrad: ~${status.protectionPct} %`,
-    status.lastSprayDate ? `Letzte Spritzung: ${status.lastSprayDate}` : 'Keine Spritzung erfasst',
-  ]
+  const relevant = data.diseases.filter((d) => AGGREGATE_KEYS.has(d.key))
+  const rank: Record<string, number> = { rot: 0, gelb: 1, grün: 2, '': 3 }
+  const worst = [...relevant].sort((a, b) => rank[a.effectiveLevel] - rank[b.effectiveLevel])[0]
+  const level = worst?.effectiveLevel || 'grün'
+  const icon = LEVEL_ICON[level] ?? '⚪'
+  const chipColor = LEVEL_CHIP_COLOR[level as keyof typeof LEVEL_CHIP_COLOR] ?? 'default'
 
   return (
     <Tooltip
+      arrow
       title={
         <Box>
-          {tooltipLines.map((l) => (
-            <Typography key={l} variant="caption" component="p">{l}</Typography>
+          <Typography variant="caption" component="p">
+            Station: {data.stationName}
+          </Typography>
+          {relevant.map((d) => (
+            <Typography key={d.key} variant="caption" component="p">
+              {LEVEL_ICON[d.effectiveLevel] ?? '⚪'} {d.name}
+            </Typography>
           ))}
         </Box>
       }
-      arrow
     >
       <Chip
-        label={label}
+        label={`${icon} Pflanzenschutz`}
         size="small"
         color={chipColor}
-        variant="filled"
         sx={{ fontWeight: 500, cursor: 'default' }}
       />
     </Tooltip>

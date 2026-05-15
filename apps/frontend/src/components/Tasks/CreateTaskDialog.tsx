@@ -17,6 +17,7 @@ interface Props {
   open: boolean
   pendingLocation: GeoJSONPoint | null
   vineyardId?: string
+  mode?: 'pflanzenschutz'
   onStartPicking?: () => void
   onSubmit: (params: CreateTaskParams) => Promise<Task>
   onClose: () => void
@@ -42,7 +43,7 @@ function useGPSPicker() {
   return { loading, error, pick }
 }
 
-export default function CreateTaskDialog({ open, pendingLocation, vineyardId, onStartPicking, onSubmit, onClose }: Props) {
+export default function CreateTaskDialog({ open, pendingLocation, vineyardId, mode, onStartPicking, onSubmit, onClose }: Props) {
   const theme = useTheme()
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'))
   const [internalLocation, setInternalLocation] = useState<GeoJSONPoint | null>(null)
@@ -127,9 +128,11 @@ export default function CreateTaskDialog({ open, pendingLocation, vineyardId, on
     </Box>
   )
 
+  const dialogTitle = mode === 'pflanzenschutz' ? 'Pflanzenschutz-Massnahme' : 'Neue Aufgabe'
+
   const title = (
     <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Neue Aufgabe</Typography>
+      <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>{dialogTitle}</Typography>
       <IconButton size="small" onClick={handleClose} sx={{ minWidth: 44, minHeight: 44 }}>
         <CloseIcon fontSize="small" />
       </IconButton>
@@ -142,6 +145,7 @@ export default function CreateTaskDialog({ open, pendingLocation, vineyardId, on
       <TaskForm
         location={location ?? undefined}
         vineyardId={vineyardId}
+        mode={mode}
         onSubmit={onSubmit}
         onCancel={handleClose}
       />

@@ -14,7 +14,12 @@ func TestMigrations(t *testing.T) {
 
 	testutil.RunMigrations(t, db)
 
-	tables := []string{"users", "vineyards", "rows", "vines", "tasks", "task_photos"}
+	tables := []string{
+		"users", "vineyards", "rows", "vines", "tasks", "task_photos",
+		"psm_substances", "psm_pests", "psm_products",
+		"psm_product_substances", "psm_indications", "psm_sync_meta",
+		"spray_applications", "protection_periods",
+	}
 	for _, tbl := range tables {
 		var count int64
 		err := db.Raw("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name=?", tbl).Scan(&count).Error
